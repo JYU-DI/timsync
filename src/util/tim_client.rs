@@ -164,6 +164,20 @@ impl TimClient {
             .header("Referer", &self.tim_host)
     }
 
+    /// Create a PUT request to a TIM API endpoint.
+    ///
+    /// # Arguments
+    ///
+    /// * `tim_url`: Endpoint to make the request to. The hostname is automatically prepended.
+    ///
+    /// returns: RequestBuilder
+    pub fn put(&self, tim_url: &str) -> RequestBuilder {
+        self.client
+            .put(format!("{}/{}", &self.tim_host, tim_url))
+            .header("X-XSRF-TOKEN", &self.xsrf_token)
+            .header("Referer", &self.tim_host)
+    }
+
     /// Create a GET request to a TIM API endpoint.
     ///
     /// # Arguments
@@ -251,6 +265,36 @@ impl TimClient {
                 }
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Set the title of an item (document or folder) in TIM.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_path`: Full path to the new item, e.g. `kurssit/tie/kurssi`.
+    /// * `title`: New title for the item.
+    ///
+    /// returns: Result<(), Error>
+    pub async fn set_item_title(&self, item_path: &str, title: &str) -> Result<()> {
+        let item = self.get_item_info(item_path).await?;
+
+        let result = self
+            .put(&format!("changeTitle/{}", item.id))
+            .json(&json!({
+                "new_title": title,
+            }))
+            .send()
+            .await
+            .with_context(|| format!("Could not set title for item {}", item_path))?;
+
+        if result.status().is_success() {
+            Ok(())
+        } else {
+            Err(
+                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
+                    .into(),
+            )
         }
     }
 

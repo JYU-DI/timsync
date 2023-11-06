@@ -11,6 +11,7 @@ use thiserror::Error;
 use walkdir::WalkDir;
 
 use crate::project::config::SyncTarget;
+use crate::project::markdown_document::MarkdownDocument;
 use crate::project::project::Project;
 use crate::util::path::{Relativize, WithSetExtension};
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
@@ -53,11 +54,18 @@ async fn process_markdown(
     tick_progress.set_message(format!("{}: Preparing", doc_path));
     tick_progress.tick();
 
-    let markdown_content = std::fs::read_to_string(&md_path)
-        .with_context(|| format!("Could not open {}", md_path.display()))?;
+    let markdown_file = MarkdownDocument::read_from(&md_path)?;
 
     // TODO: Read title from front matter of the markdown
+    let front_matter = markdown_file.front_matter();
     let file_name = md_path.file_stem().unwrap().to_string_lossy();
+
+    let doc_title = front_matter
+        .as_ref()
+        .and_then(|fm| fm.title.as_ref())
+        .map(|t| t.as_str())
+        .unwrap_or_else(|| file_name.as_ref());
+
     let doc_path_tim = format!("{}/{}", target_info.folder_root, doc_path);
 
     tick_progress.set_message(format!("{}: Checking item info", doc_path));
@@ -73,7 +81,7 @@ async fn process_markdown(
                 tick_progress.tick();
 
                 client
-                    .create_item(ItemType::Document, &doc_path_tim, &file_name)
+                    .create_item(ItemType::Document, &doc_path_tim, doc_title)
                     .await?;
             }
             _ => {
@@ -95,11 +103,16 @@ async fn process_markdown(
         }
     }
 
+    tick_progress.set_message(format!("{}: Updating title", doc_path));
+    tick_progress.tick();
+
+    client.set_item_title(&doc_path_tim, doc_title).await?;
+
     tick_progress.set_message(format!("{}: Uploading new markdown", doc_path));
     tick_progress.tick();
 
     client
-        .upload_markdown(&doc_path_tim, &markdown_content)
+        .upload_markdown(&doc_path_tim, &markdown_file.to_tim_markdown())
         .await?;
 
     Ok(())
