@@ -148,7 +148,7 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
         .map(|p| (p.relativize(&root).with_set_extension(""), p))
         .collect::<Vec<_>>();
 
-    println!("Syncing {} documents", md_files.len());
+    info!("Syncing {} documents", md_files.len());
 
     let multi_progress = MultiProgress::new();
     let total_progress = multi_progress.add(
