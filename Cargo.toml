@@ -23,6 +23,8 @@ toml = "0.8.6"
 serde = { version = "1.0.190", features = ["derive"] }
 walkdir = "2.4.0"
 futures = "0.3.29"
+markdown = "1.0.0-alpha.14"
+
 
 [build-dependencies]
 shadow-rs = "0.24.1"
