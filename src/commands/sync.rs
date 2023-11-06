@@ -10,7 +10,8 @@ use simplelog::info;
 use thiserror::Error;
 use walkdir::WalkDir;
 
-use crate::config::{Project, SyncTarget};
+use crate::project::config::SyncTarget;
+use crate::project::project::Project;
 use crate::util::path::{Relativize, WithSetExtension};
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
 

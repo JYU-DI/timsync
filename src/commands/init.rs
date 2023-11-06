@@ -9,7 +9,7 @@ use simplelog::{error, info};
 use thiserror::Error;
 
 use crate::commands::target::prompt_user_details_interactive;
-use crate::config::{SyncConfig, SyncTarget, CONFIG_FILE_NAME, CONFIG_FOLDER};
+use crate::project::config::{SyncConfig, SyncTarget, CONFIG_FILE_NAME, CONFIG_FOLDER};
 
 #[derive(Debug, Args)]
 pub struct InitOptions {

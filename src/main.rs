@@ -11,7 +11,7 @@ use commands::InitOptions;
 use crate::commands::SyncOpts;
 
 mod commands;
-mod config;
+mod project;
 mod util;
 
 shadow!(build);
