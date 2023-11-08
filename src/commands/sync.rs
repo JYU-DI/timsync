@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -44,6 +44,8 @@ enum SyncError {
 // TODO: Move to own file
 // TODO: Multiprocessing?
 async fn process_markdown(
+    root: &Path,
+    root_url: &String,
     doc_path: PathBuf,
     md_path: PathBuf,
     client: &TimClient,
@@ -66,7 +68,11 @@ async fn process_markdown(
         .map(|t| t.as_str())
         .unwrap_or_else(|| file_name.as_ref());
 
-    let doc_path_tim = format!("{}/{}", target_info.folder_root, doc_path);
+    let doc_path_tim = format!(
+        "{}/{}",
+        target_info.folder_root,
+        doc_path.replace("\\", "/")
+    );
 
     tick_progress.set_message(format!("{}: Checking item info", doc_path));
     tick_progress.tick();
@@ -112,7 +118,10 @@ async fn process_markdown(
     tick_progress.tick();
 
     client
-        .upload_markdown(&doc_path_tim, &markdown_file.to_tim_markdown())
+        .upload_markdown(
+            &doc_path_tim,
+            &markdown_file.to_tim_markdown(root, root_url),
+        )
         .await?;
 
     Ok(())
@@ -183,8 +192,16 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
     let futures = md_files
         .into_iter()
         .map(|(doc_path, md_path)| async {
-            let res =
-                process_markdown(doc_path, md_path, &client, &target_info, &tick_progress).await;
+            let res = process_markdown(
+                root,
+                &target_info.folder_root,
+                doc_path,
+                md_path,
+                &client,
+                &target_info,
+                &tick_progress,
+            )
+            .await;
             total_progress.inc(1);
             res
         })

@@ -25,6 +25,7 @@ walkdir = "2.4.0"
 futures = "0.3.29"
 markdown = "1.0.0-alpha.14"
 serde_yaml = "0.9.27"
+url = "2.4.1"
 
 
 [build-dependencies]
