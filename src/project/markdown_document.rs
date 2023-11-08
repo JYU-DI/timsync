@@ -5,14 +5,20 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use url::{ParseError, Url};
 
+/// A single Markdown document in the project
 pub struct MarkdownDocument {
+    /// Absolute path to the document
     pub path: PathBuf,
     contents: String,
     mdast: Root,
 }
 
 #[derive(Debug, Deserialize)]
+/// Settings for a document
+/// The settings are stored in the front matter of the document
 pub struct DocumentSettings {
+    /// The human-readable title of the document
+    /// The title is displayed in the navigation bar of TIM
     pub title: Option<String>,
 }
 
@@ -20,6 +26,13 @@ pub struct DocumentSettings {
 struct DocumentLink<'a>(usize, usize, &'a String);
 
 impl MarkdownDocument {
+    /// Reads a markdown document from the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path`: The path to the markdown file
+    ///
+    /// returns: Result<MarkdownDocument, Error>
     pub fn read_from(path: &PathBuf) -> Result<Self> {
         let contents = std::fs::read_to_string(&path)
             .with_context(|| format!("Could not read markdown file: {}", path.display()))?;
@@ -93,12 +106,28 @@ impl MarkdownDocument {
         }
     }
 
+    /// Returns the front matter of the document as a DocumentSettings struct.
+    /// Returns None if the front matter could not be parsed or if there is no front matter.
+    ///
+    /// returns: Option<DocumentSettings>
     pub fn front_matter(&self) -> Option<DocumentSettings> {
         let yaml = self.find_front_matter()?;
         let settings = serde_yaml::from_str(&yaml.value).ok()?;
         Some(settings)
     }
 
+    /// Converts the markdown document to a TIM markdown document.
+    /// This transforms the markdown as follows:
+    ///
+    /// - Removes the front matter
+    /// - Resolves relative links to absolute links
+    ///
+    /// # Arguments
+    ///
+    /// * `project_dir`: The absolute path to the project directory
+    /// * `root_url`: The root URL of the TIM target folder
+    ///
+    /// returns: String
     pub fn to_tim_markdown(&self, project_dir: &Path, root_url: &String) -> String {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
