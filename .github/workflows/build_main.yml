@@ -67,7 +67,7 @@ jobs:
           automatic_release_tag: "ci"
           prerelease: true
           title: "CI build"
-          files: artifacts/*.*
+          files: artifacts/**/*.*
 #    - name: Create Release
 #      id: create_release
 #      uses: actions/create-release@v1
