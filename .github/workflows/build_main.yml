@@ -1,0 +1,38 @@
+name: Build on main
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --release --verbose
+    - name: Rename asset
+      run: |
+        mkdir artifacts
+        cp target/release/timsync artifacts/timsync.linux.x86_64
+    - name: Collect artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: timsync.linux.x86_64
+        path: artifacts/timsync.linux.x86_64
+#    - name: Create Release
+#      id: create_release
+#      uses: actions/create-release@v1
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        tag_name: ${{ github.ref }}
+#        release_name: CI build
+#        draft: false
+#        prerelease: true
+#    - name: Run tests
+#      run: cargo test --verbose
