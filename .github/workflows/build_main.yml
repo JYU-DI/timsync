@@ -9,7 +9,20 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe_name: timsync
+            platform: linux.x86_64
+          - os: macos-latest
+            exe_name: timsync
+            platform: macos.x86_64
+          - os: windows-latest
+            exe_name: timsync.exe
+            platform: windows.x64.exe
+      
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
@@ -18,12 +31,12 @@ jobs:
     - name: Rename asset
       run: |
         mkdir artifacts
-        cp target/release/timsync artifacts/timsync.linux.x86_64
+        cp target/release/${{ matrix.exe_name }} artifacts/timsync.${{ matrix.platform }}
     - name: Collect artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: timsync.linux.x86_64
-        path: artifacts/timsync.linux.x86_64
+        name: timsync.${{ matrix.platform }}
+        path: artifacts/timsync.${{ matrix.platform }}
 #    - name: Create Release
 #      id: create_release
 #      uses: actions/create-release@v1
