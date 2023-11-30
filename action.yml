@@ -26,7 +26,7 @@ runs:
     using: "composite"
     steps:
         - id: timsync
-          run: ./action/entrypoint.sh
+          run: $GITHUB_ACTION_PATH/action/entrypoint.sh
           shell: bash
           env:
               TIM_HOST: ${{ inputs.host }}
