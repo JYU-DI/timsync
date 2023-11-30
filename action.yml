@@ -1,0 +1,37 @@
+name: timsync-action
+author: "TIM"
+description: "Syncs a repo with TIM using timsync"
+
+inputs:
+    host:
+        description: "TIM host to use"
+        required: true
+    folder_root:
+        description: "TIM folder to sync to"
+        required: true
+    username:
+        description: "TIM username"
+        required: true
+    password:
+        description: "TIM password"
+        required: true
+    path:
+        description: "Path to sync"
+        required: false
+    timsync_version:
+        description: "Version of timsync to use"
+        required: false
+
+runs:
+    using: "composite"
+    steps:
+        - id: timsync
+          run: ./action/entrypoint.sh
+          shell: bash
+          env:
+              TIM_HOST: ${{ inputs.host }}
+              TIM_FOLDER_ROOT: ${{ inputs.folder_root }}
+              TIM_USERNAME: ${{ inputs.username }}
+              TIM_PASSWORD: ${{ inputs.password }}
+              ROOT_FOLDER: ${{ inputs.path }}
+              TIMSYNC_VERSION: ${{ inputs.timsync_version }}
