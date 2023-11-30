@@ -1,8 +1,6 @@
-name: Build on main
+name: Build
 
-on:
-  push:
-    branches: [ "main" ]
+on: push
 
 env:
   CARGO_TERM_COLOR: always
@@ -37,6 +35,26 @@ jobs:
       with:
         name: timsync.${{ matrix.platform }}
         path: artifacts/timsync.${{ matrix.platform }}
+
+  collect:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - build
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3.0.0
+        with:
+          path: artifacts
+      - name: Create release
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "ci"
+          prerelease: true
+          title: "CI build"
+          files: artifacts/*
 #    - name: Create Release
 #      id: create_release
 #      uses: actions/create-release@v1
