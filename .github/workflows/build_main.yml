@@ -24,6 +24,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build --release --verbose
     - name: Rename asset
@@ -45,7 +54,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-
+  
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3.0.0
@@ -58,7 +67,7 @@ jobs:
           automatic_release_tag: "ci"
           prerelease: true
           title: "CI build"
-          files: artifacts/*
+          files: artifacts/*.*
 #    - name: Create Release
 #      id: create_release
 #      uses: actions/create-release@v1
