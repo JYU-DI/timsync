@@ -109,6 +109,18 @@ async fn process_markdown(
         }
     }
 
+    tick_progress.set_message(format!("{}: Checking contents", doc_path));
+    tick_progress.tick();
+
+    let doc_markdown = client.download_markdown(&doc_path_tim).await?;
+    let new_markdown = markdown_file.to_tim_markdown(root, root_url);
+
+    if new_markdown.timestamp_equals(&doc_markdown) {
+        tick_progress.set_message(format!("{}: Skipping because contents are equal", doc_path));
+        tick_progress.tick();
+        return Ok(());
+    }
+
     tick_progress.set_message(format!("{}: Updating title", doc_path));
     tick_progress.tick();
 
@@ -118,10 +130,7 @@ async fn process_markdown(
     tick_progress.tick();
 
     client
-        .upload_markdown(
-            &doc_path_tim,
-            &markdown_file.to_tim_markdown(root, root_url),
-        )
+        .upload_markdown(&doc_path_tim, &new_markdown.with_timestamp())
         .await?;
 
     Ok(())

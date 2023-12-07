@@ -1,7 +1,11 @@
 use anyhow::{Context, Result};
+use lazy_regex::regex;
 use markdown::mdast::{Node, Root, Yaml};
 use markdown::{Constructs, ParseOptions};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sha1::Digest;
+use sha1::Sha1;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use url::{ParseError, Url};
 
@@ -128,7 +132,7 @@ impl MarkdownDocument {
     /// * `root_url`: The root URL of the TIM target folder
     ///
     /// returns: String
-    pub fn to_tim_markdown(&self, project_dir: &Path, root_url: &String) -> String {
+    pub fn to_tim_markdown(&self, project_dir: &Path, root_url: &String) -> PreparedMarkdown {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
 
@@ -177,6 +181,100 @@ impl MarkdownDocument {
             }
         }
 
-        res
+        res.into()
+    }
+}
+
+/// A markdown document that is ready to be uploaded to TIM.
+pub struct PreparedMarkdown(String);
+
+impl PreparedMarkdown {
+    /// Calculates the SHA1 hash of the markdown.
+    /// This is used to check if the markdown has changed.
+    ///
+    /// returns: String
+    pub fn sha1(&self) -> String {
+        let mut hasher = Sha1::new();
+        hasher.update(self.0.as_bytes());
+        let result = hasher.finalize();
+        format!("{:x}", result)
+    }
+
+    /// Prepends the timestamp to the markdown.
+    /// The timestamp is stored in the settings block of the markdown.
+    ///
+    /// returns: PreparedMarkdown
+    pub fn with_timestamp(&self) -> PreparedMarkdown {
+        let sha1 = self.sha1();
+        // prepend the timestamp to the markdown
+        Self(format!(
+            "{}\n\n{}",
+            TimSyncDocSettings::new(sha1).to_markdown(),
+            self.0
+        ))
+    }
+
+    /// Checks if the timestamp in the markdown equals the hash in the given markdown.
+    ///
+    /// # Arguments
+    ///
+    /// * `md`: The markdown to check
+    ///
+    /// returns: bool
+    pub fn timestamp_equals(&self, md: &str) -> bool {
+        // Try to find the settings in the markdown with regex
+        let re = regex!(r#"```\s*\{\s*?settings="timsync".*?\}\n(?P<settings>(?:.|\s)*?)```"#);
+        let result = re.captures(md);
+        match result {
+            Some(captures) => {
+                let settings_str = captures.name("settings").unwrap().as_str();
+                TimSyncDocSettings::from_yaml(settings_str)
+                    .map(|settings| settings.hash == self.sha1())
+                    .unwrap_or(false)
+            }
+            None => false,
+        }
+    }
+}
+
+impl From<PreparedMarkdown> for String {
+    fn from(markdown: PreparedMarkdown) -> Self {
+        markdown.0
+    }
+}
+
+impl Deref for PreparedMarkdown {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<String> for PreparedMarkdown {
+    fn from(markdown: String) -> Self {
+        Self(markdown)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct TimSyncDocSettings {
+    hash: String,
+}
+
+impl TimSyncDocSettings {
+    fn new(hash: String) -> Self {
+        Self { hash }
+    }
+
+    fn from_yaml(yaml: &str) -> Result<Self> {
+        let settings: Self =
+            serde_yaml::from_str(&yaml).with_context(|| "Could not parse timsync docsettings")?;
+        Ok(settings)
+    }
+
+    fn to_markdown(&self) -> String {
+        let yaml_str = serde_yaml::to_string(&self).unwrap();
+        format!("``` {{settings=\"timsync\"}}\n{}```\n", yaml_str)
     }
 }
