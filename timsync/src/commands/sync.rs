@@ -113,7 +113,7 @@ async fn process_markdown(
     tick_progress.tick();
 
     let doc_markdown = client.download_markdown(&doc_path_tim).await?;
-    let new_markdown = markdown_file.to_tim_markdown(root, root_url);
+    let new_markdown = markdown_file.to_tim_markdown(root, root_url)?;
 
     if new_markdown.timestamp_equals(&doc_markdown) {
         tick_progress.set_message(format!("{}: Skipping because contents are equal", doc_path));

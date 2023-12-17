@@ -9,6 +9,8 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use url::{ParseError, Url};
 
+use crate::util::templating::render_str;
+
 /// A single Markdown document in the project
 pub struct MarkdownDocument {
     /// Absolute path to the document
@@ -132,7 +134,11 @@ impl MarkdownDocument {
     /// * `root_url`: The root URL of the TIM target folder
     ///
     /// returns: String
-    pub fn to_tim_markdown(&self, project_dir: &Path, root_url: &String) -> PreparedMarkdown {
+    pub fn to_tim_markdown(
+        &self,
+        project_dir: &Path,
+        root_url: &String,
+    ) -> Result<PreparedMarkdown> {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
 
@@ -181,7 +187,10 @@ impl MarkdownDocument {
             }
         }
 
-        res.into()
+        res = render_str(&res)
+            .with_context(|| format!("Could not render markdown file {}", self.path.display()))?;
+
+        Ok(res.into())
     }
 }
 
