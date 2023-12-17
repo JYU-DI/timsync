@@ -1,0 +1,40 @@
+[package]
+name = "timsync"
+version = "0.1.0"
+edition = "2021"
+description = "A tool to sync documents to TIM"
+authors = ["Denis Zhidkikh <dezhidki@jyu.fi>"]
+
+[dependencies]
+anyhow = "1.0.75"
+clap = { version = "4.4.7", features = ["derive"] }
+console = "0.15.7"
+dialoguer = "0.11.0"
+indicatif = "0.17.7"
+log = "0.4.20"
+path-absolutize = "3.1.1"
+reqwest = { version = "0.11.22", features = ["json", "cookies"] }
+shadow-rs = "0.24.1"
+simplelog = { version = "0.12.1", features = ["paris"] }
+thiserror = "1.0.50"
+tokio = { version = "1.33.0", features = ["full"] }
+serde_json = "1.0.107"
+toml = "0.8.6"
+serde = { version = "1.0.190", features = ["derive"] }
+walkdir = "2.4.0"
+futures = "0.3.29"
+markdown = "1.0.0-alpha.14"
+serde_yaml = "0.9.27"
+url = "2.4.1"
+sha1 = "0.10.6"
+lazy-regex = "3.1.0"
+tera = { path = "../vendor/tera" }
+
+
+[build-dependencies]
+shadow-rs = "0.24.1"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
