@@ -1,6 +1,7 @@
-use std::path::{Path, PathBuf};
+use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
+use crate::project::global_ctx::{GlobalContextBuilder, GLOBAL_DATA_CONFIG_FILE};
 use simplelog::warn;
-use crate::project::config::{CONFIG_FILE_NAME, CONFIG_FOLDER, SyncConfig};
+use std::path::{Path, PathBuf};
 
 /// A TIMSync project
 ///
@@ -19,6 +20,17 @@ impl Project {
     /// Get the root path of the project
     pub fn get_root_path(&self) -> &Path {
         &self.root_path
+    }
+
+    pub fn get_data_context(&self) -> anyhow::Result<tera::Context> {
+        let mut builder = GlobalContextBuilder::new();
+
+        let global_config_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
+        if global_config_path.exists() {
+            builder.add_global_data(&global_config_path)?;
+        }
+
+        Ok(builder.build())
     }
 
     /// Resolve a project from a directory path.

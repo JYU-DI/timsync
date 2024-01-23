@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use crate::commands::target::prompt_user_details_interactive;
 use crate::project::config::{SyncConfig, SyncTarget, CONFIG_FILE_NAME, CONFIG_FOLDER};
+use crate::project::global_ctx::{DEFAULT_GLOBAL_DATA, GLOBAL_DATA_CONFIG_FILE};
 
 #[derive(Debug, Args)]
 pub struct InitOptions {
@@ -122,6 +123,14 @@ pub async fn init_repo(opts: InitOptions) -> Result<()> {
     } else {
         std::fs::write(&gitignore_file, DEFAULT_GITIGNORE_CONTENT)
             .context("Could create .gitignore file")?;
+    }
+
+    let global_config_file = target_path.join(&GLOBAL_DATA_CONFIG_FILE);
+
+    // Create or update the _config.yml file
+    if !global_config_file.exists() {
+        std::fs::write(&global_config_file, &DEFAULT_GLOBAL_DATA)
+            .context("Could not create global data config file")?;
     }
 
     Ok(())

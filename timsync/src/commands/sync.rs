@@ -51,6 +51,7 @@ async fn process_markdown(
     client: &TimClient,
     target_info: &SyncTarget,
     tick_progress: &ProgressBar,
+    global_context: &tera::Context,
 ) -> Result<()> {
     let doc_path = doc_path.to_string_lossy();
     tick_progress.set_message(format!("{}: Preparing", doc_path));
@@ -58,11 +59,10 @@ async fn process_markdown(
 
     let markdown_file = MarkdownDocument::read_from(&md_path)?;
 
-    // TODO: Read title from front matter of the markdown
-    let front_matter = markdown_file.front_matter();
+    let doc_settings = markdown_file.settings();
     let file_name = md_path.file_stem().unwrap().to_string_lossy();
 
-    let doc_title = front_matter
+    let doc_title = doc_settings
         .as_ref()
         .and_then(|fm| fm.title.as_ref())
         .map(|t| t.as_str())
@@ -113,7 +113,7 @@ async fn process_markdown(
     tick_progress.tick();
 
     let doc_markdown = client.download_markdown(&doc_path_tim).await?;
-    let new_markdown = markdown_file.to_tim_markdown(root, root_url)?;
+    let new_markdown = markdown_file.to_tim_markdown(root, root_url, Some(global_context))?;
 
     if new_markdown.timestamp_equals(&doc_markdown) {
         tick_progress.set_message(format!("{}: Skipping because contents are equal", doc_path));
@@ -157,6 +157,10 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
 
     let root = project.get_root_path();
     // Find all .md files in the project, skip folders starting with a dot or underscore
+
+    let global_context = project
+        .get_data_context()
+        .context("Could not read global data")?;
 
     let md_files = WalkDir::new(root)
         .into_iter()
@@ -209,6 +213,7 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
                 &client,
                 &target_info,
                 &tick_progress,
+                &global_context,
             )
             .await;
             total_progress.inc(1);

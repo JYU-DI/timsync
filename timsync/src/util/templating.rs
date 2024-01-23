@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 use serde_json::Value;
+
 use tera::Context;
 use tera::Error;
 use tera::Result;
@@ -37,17 +38,6 @@ lazy_static! {
         tera
     };
     static ref EMPTY_CONTEXT: Context = Context::new();
-}
-
-/// Renders a template string with the given context.
-///
-/// # Arguments
-///
-/// * `template` - The template string to render
-///
-/// returns: Result<String>
-pub fn render_str(template: &str) -> Result<String> {
-    render_str_ctx(template, &EMPTY_CONTEXT)
 }
 
 /// Renders a template string with the given context.

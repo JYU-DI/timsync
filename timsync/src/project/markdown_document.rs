@@ -1,15 +1,17 @@
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+
 use anyhow::{Context, Result};
 use lazy_regex::regex;
 use markdown::mdast::{Node, Root, Yaml};
 use markdown::{Constructs, ParseOptions};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha1::Digest;
 use sha1::Sha1;
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
 use url::{ParseError, Url};
 
-use crate::util::templating::render_str;
+use crate::util::templating::render_str_ctx;
 
 /// A single Markdown document in the project
 pub struct MarkdownDocument {
@@ -116,10 +118,22 @@ impl MarkdownDocument {
     /// Returns None if the front matter could not be parsed or if there is no front matter.
     ///
     /// returns: Option<DocumentSettings>
-    pub fn front_matter(&self) -> Option<DocumentSettings> {
+    pub fn settings(&self) -> Option<DocumentSettings> {
+        // TODO: This should return Result instead
         let yaml = self.find_front_matter()?;
         let settings = serde_yaml::from_str(&yaml.value).ok()?;
         Some(settings)
+    }
+
+    /// Returns the front matter of the document as a serde_json::Value.
+    /// Returns None if the front matter could not be parsed or if there is no front matter.
+    ///
+    /// returns: Option<Value>
+    pub fn front_matter_json(&self) -> Option<Value> {
+        // TODO: This should return Result instead
+        let yaml = self.find_front_matter()?;
+        let front_matter = serde_yaml::from_str(&yaml.value).ok()?;
+        Some(front_matter)
     }
 
     /// Converts the markdown document to a TIM markdown document.
@@ -132,12 +146,14 @@ impl MarkdownDocument {
     ///
     /// * `project_dir`: The absolute path to the project directory
     /// * `root_url`: The root URL of the TIM target folder
+    /// * `global_context`: The global context to use for rendering the markdown
     ///
     /// returns: String
     pub fn to_tim_markdown(
         &self,
         project_dir: &Path,
         root_url: &String,
+        global_context: Option<&tera::Context>,
     ) -> Result<PreparedMarkdown> {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
@@ -187,7 +203,18 @@ impl MarkdownDocument {
             }
         }
 
-        res = render_str(&res)
+        let mut ctx = tera::Context::new();
+        if let Some(global_context) = global_context {
+            ctx.extend(global_context.clone());
+        }
+        let front_matter_ctx = self
+            .front_matter_json()
+            .and_then(|fm| tera::Context::from_value(fm).ok());
+        if let Some(front_matter_ctx) = front_matter_ctx {
+            ctx.extend(front_matter_ctx);
+        }
+
+        res = render_str_ctx(&res, &ctx)
             .with_context(|| format!("Could not render markdown file {}", self.path.display()))?;
 
         Ok(res.into())
