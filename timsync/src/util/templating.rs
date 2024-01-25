@@ -40,16 +40,16 @@ lazy_static! {
     static ref EMPTY_CONTEXT: Context = Context::new();
 }
 
-/// Renders a template string with the given context.
-///
-/// # Arguments
-///
-/// * `template` - The template string to render
-/// * `ctx` - The context to render the template with
-///
-/// returns: Result<String>
-pub fn render_str_ctx(template: &str, ctx: &Context) -> Result<String> {
-    let mut tera = Tera::default();
-    tera.extend(&TIM_TEMPLATES)?;
-    tera.render_str(template, ctx)
+pub trait TeraExt {
+    /// Extend the Tera instance with the TIM templates.
+    ///
+    /// returns: &Self
+    fn with_tim_templates(self) -> Self;
+}
+
+impl TeraExt for Tera {
+    fn with_tim_templates(mut self) -> Self {
+        self.extend(&TIM_TEMPLATES).unwrap();
+        self
+    }
 }

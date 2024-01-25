@@ -1,7 +1,11 @@
+use std::path::{Path, PathBuf};
+
+use anyhow::Context;
+use simplelog::warn;
+
 use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
 use crate::project::global_ctx::{GlobalContextBuilder, GLOBAL_DATA_CONFIG_FILE};
-use simplelog::warn;
-use std::path::{Path, PathBuf};
+use crate::util::templating::TeraExt;
 
 /// A TIMSync project
 ///
@@ -16,21 +20,51 @@ pub struct Project {
 
 const MAX_SEARCH_DEPTH: usize = 10;
 
+const TEMPLATE_FOLDER: &str = "_templates";
+
 impl Project {
     /// Get the root path of the project
     pub fn get_root_path(&self) -> &Path {
         &self.root_path
     }
 
+    /// Get the Tera context that contains the project's global data.
+    ///
+    /// The global data is read from the `_config.yml` file in the project's root folder.
+    ///
+    /// returns: Result<Context, Error>
     pub fn get_data_context(&self) -> anyhow::Result<tera::Context> {
         let mut builder = GlobalContextBuilder::new();
 
         let global_config_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
-        if global_config_path.exists() {
+        if global_config_path.is_file() {
             builder.add_global_data(&global_config_path)?;
         }
 
         Ok(builder.build())
+    }
+
+    /// Get the Tera templating engine for the project.
+    ///
+    /// This includes the TIM templates from _templates folder.
+    ///
+    /// returns: Result<Tera, Error>
+    pub fn get_templating_engine(&self) -> anyhow::Result<tera::Tera> {
+        let template_folder = self.root_path.join(TEMPLATE_FOLDER);
+
+        let tera = if template_folder.is_dir() {
+            let glob_pattern = template_folder.join("**").join("*");
+            tera::Tera::new(&glob_pattern.to_string_lossy()).with_context(|| {
+                format!(
+                    "Could not load templates from {}",
+                    template_folder.display()
+                )
+            })?
+        } else {
+            tera::Tera::default()
+        };
+
+        Ok(tera.with_tim_templates())
     }
 
     /// Resolve a project from a directory path.

@@ -11,7 +11,7 @@ use sha1::Digest;
 use sha1::Sha1;
 use url::{ParseError, Url};
 
-use crate::util::templating::render_str_ctx;
+use crate::util::templating::TeraExt;
 
 /// A single Markdown document in the project
 pub struct MarkdownDocument {
@@ -154,6 +154,7 @@ impl MarkdownDocument {
         project_dir: &Path,
         root_url: &String,
         global_context: Option<&tera::Context>,
+        tera: Option<&tera::Tera>,
     ) -> Result<PreparedMarkdown> {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
@@ -214,7 +215,13 @@ impl MarkdownDocument {
             ctx.extend(front_matter_ctx);
         }
 
-        res = render_str_ctx(&res, &ctx)
+        let mut tera = tera
+            .map(|tera| tera.clone()) // TODO: Remove clone by editing tera
+            .unwrap_or_else(|| tera::Tera::default().with_tim_templates());
+
+        // Init default tera instance if none is given
+        res = tera
+            .render_str(&res, &ctx)
             .with_context(|| format!("Could not render markdown file {}", self.path.display()))?;
 
         Ok(res.into())

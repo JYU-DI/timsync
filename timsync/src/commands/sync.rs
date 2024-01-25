@@ -52,6 +52,7 @@ async fn process_markdown(
     target_info: &SyncTarget,
     tick_progress: &ProgressBar,
     global_context: &tera::Context,
+    tera: &tera::Tera,
 ) -> Result<()> {
     let doc_path = doc_path.to_string_lossy();
     tick_progress.set_message(format!("{}: Preparing", doc_path));
@@ -113,7 +114,8 @@ async fn process_markdown(
     tick_progress.tick();
 
     let doc_markdown = client.download_markdown(&doc_path_tim).await?;
-    let new_markdown = markdown_file.to_tim_markdown(root, root_url, Some(global_context))?;
+    let new_markdown =
+        markdown_file.to_tim_markdown(root, root_url, Some(global_context), Some(tera))?;
 
     if new_markdown.timestamp_equals(&doc_markdown) {
         tick_progress.set_message(format!("{}: Skipping because contents are equal", doc_path));
@@ -161,6 +163,10 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
     let global_context = project
         .get_data_context()
         .context("Could not read global data")?;
+
+    let tera = project
+        .get_templating_engine()
+        .context("Could not initialize the templating engine")?;
 
     let md_files = WalkDir::new(root)
         .into_iter()
@@ -214,6 +220,7 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
                 &target_info,
                 &tick_progress,
                 &global_context,
+                &tera,
             )
             .await;
             total_progress.inc(1);
