@@ -17,7 +17,7 @@ Needed parameters:
 > TODO: The `doc` must be a docId for now. In the future, it can be a relative path in which case the ID would be
 > automatically resolved.
 
-{$ ref(doc=site.tasks_doc, area="task1") $}
+{{ ref(doc=site.tasks_doc, area="task1") }}
 
 ## Importing using the `task` function
 
@@ -33,6 +33,6 @@ The only available parameters:
 
 {$ raw $}
 
-{$ task(uid="task1") $}
+{{ task(uid="task1") }}
 
 {$ endraw $}
