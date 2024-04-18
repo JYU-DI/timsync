@@ -1,0 +1,24 @@
+---
+# An example of a task as defined via TIMSync
+# The below two options are handled by TIMSync and are mandatory
+uid: task1    # Global identifier for this file.
+type: plugin  # Type of the file. This defines how this file should be processed by TIMSync.
+
+plugin: csPlugin # Value used by `plugin` type to define what plugin to emit.
+---
+header: C#
+stem: |
+  This is a description of the task.
+type: cs/comtest/doc
+filename: HelloWorld
+fullprogram: |
+  using System;
+  class HelloWorld
+  {
+    static void Main()
+    {
+      Console.WriteLine("Hello, World!");
+    }
+  }
+# THIS IS AN IDEA, NOT IMPLEMENTED YET
+# fullprogram: {{ file('HelloWorld.cs') }} # Load the contents of HelloWorld.cs during preprocessing
