@@ -1,0 +1,16 @@
+# The config file can be used to define global variables
+# available to all templates.
+# The defined values are accessible via the site variable as such:
+#
+#   {{ site.test }}
+#
+
+tasks_doc: 1
+
+test: wew
+
+test2:
+  wew1: wew2
+  wew3:
+    - wew4
+    - wew5
