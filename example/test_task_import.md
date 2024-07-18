@@ -17,7 +17,7 @@ Needed parameters:
 > TODO: The `doc` must be a docId for now. In the future, it can be a relative path in which case the ID would be
 > automatically resolved.
 
-{{ ref(doc=site.tasks_doc, area="task1") }}
+{{ref site.tasks_doc "task1"}}
 
 ## Importing using the `task` function
 
@@ -31,8 +31,8 @@ The only available parameters:
 - The task is defined in this project using the identifier above.
 - The function automatically handles creating the relevant references and generating a task.
 
-{$ raw $}
+{{{raw}}}
 
-{{ task(uid="task1") }}
+{{task "task1"}}
 
-{$ endraw $}
+{{{/raw}}}

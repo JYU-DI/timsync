@@ -2,7 +2,7 @@
 
 resolver = "2"
 
-members = ["timsync", "vendor/tera"]
+members = ["timsync"]
 
 [profile.release]
 strip = true

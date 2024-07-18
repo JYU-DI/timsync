@@ -5,12 +5,12 @@ wew: true
 
 ``` {settings=""}
 macros:
-  wew: {{ site.test2 | json_encode }} 
+  wew: {{ json_to_str site.test2 }} 
 ```
 
 # Hello, world!
 
-This is include: {$ include 'test_include.md' $}
+This is include: {{> test_include.md }}
 
 This is a test from TIMSync!
 
@@ -26,13 +26,15 @@ This is another test text!
 
 This is a link: [Testi](test_other_file)
 
-This is a template value: {{ 1 + 1 }}
+This is a template value: {{ 2 }}
 
-{$ filter area(name="test") $}
+{{area "test"}}
+
 This is an area!
 
 **wew**
-{$ endfilter $}
+
+{{/area}}
 
 ## Hello, more text!
 

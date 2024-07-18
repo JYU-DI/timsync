@@ -21,4 +21,4 @@ fullprogram: |
     }
   }
 # THIS IS AN IDEA, NOT IMPLEMENTED YET
-# fullprogram: {{ file('HelloWorld.cs') }} # Load the contents of HelloWorld.cs during preprocessing
+# fullprogram: {{ import "HelloWorld.cs" }} # Load the contents of HelloWorld.cs during preprocessing

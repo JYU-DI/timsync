@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
+use glob::glob;
 use simplelog::warn;
 
 use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
 use crate::project::global_ctx::{GlobalContextBuilder, GLOBAL_DATA_CONFIG_FILE};
-use crate::util::templating::TeraExt;
+use crate::util::path::Relativize;
+use crate::util::templating::TimRendererExt;
 
 /// A TIMSync project
 ///
@@ -28,12 +30,12 @@ impl Project {
         &self.root_path
     }
 
-    /// Get the Tera context that contains the project's global data.
+    /// Get the global context that contains the project's global data as JSON.
     ///
     /// The global data is read from the `_config.yml` file in the project's root folder.
     ///
     /// returns: Result<Context, Error>
-    pub fn get_data_context(&self) -> anyhow::Result<tera::Context> {
+    pub fn get_global_context_json(&self) -> anyhow::Result<serde_json::Value> {
         let mut builder = GlobalContextBuilder::new();
 
         let global_config_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
@@ -49,22 +51,70 @@ impl Project {
     /// This includes the TIM templates from _templates folder.
     ///
     /// returns: Result<Tera, Error>
-    pub fn get_templating_engine(&self) -> anyhow::Result<tera::Tera> {
+    pub fn get_templating_engine(&self) -> anyhow::Result<handlebars::Handlebars> {
         let template_folder = self.root_path.join(TEMPLATE_FOLDER);
 
-        let tera = if template_folder.is_dir() {
+        let mut renderer = handlebars::Handlebars::new();
+
+        if template_folder.is_dir() {
             let glob_pattern = template_folder.join("**").join("*");
-            tera::Tera::new(&glob_pattern.to_string_lossy()).with_context(|| {
+            for entry in glob(glob_pattern.to_string_lossy().as_ref()).with_context(|| {
                 format!(
-                    "Could not load templates from {}",
+                    "Could not find templates from folder {}",
                     template_folder.display()
                 )
-            })?
-        } else {
-            tera::Tera::default()
-        };
+            })? {
+                match entry {
+                    Ok(path) => {
+                        if path.is_file() {
+                            // Get path without the template folder prefix
+                            let relative = path.relativize(&template_folder);
+                            let template_name = relative.to_string_lossy().replace("\\", "/");
+                            renderer
+                                .register_template_file(&template_name, &path)
+                                .with_context(|| {
+                                    format!(
+                                        "Could not register the template file {}",
+                                        path.display()
+                                    )
+                                })?;
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
 
-        Ok(tera.with_tim_templates())
+        Ok(renderer.with_tim_templates())
+    }
+    
+    pub fn get_template_files(&self) -> anyhow::Result<Vec<(String, PathBuf)>> {
+        let template_folder = self.root_path.join(TEMPLATE_FOLDER);
+        let mut files = Vec::new();
+
+        if template_folder.is_dir() {
+            let glob_pattern = template_folder.join("**").join("*");
+            for entry in glob(glob_pattern.to_string_lossy().as_ref()).with_context(|| {
+                format!(
+                    "Could not find templates from folder {}",
+                    template_folder.display()
+                )
+            })? {
+                match entry {
+                    Ok(path) => {
+                        if path.is_file() {
+                            // Get path without the template folder prefix
+                            let relative = path.relativize(&template_folder);
+                            let template_name = relative.to_string_lossy().replace("\\", "/");
+                            files.push((template_name, path));
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
+
+        Ok(files)
     }
 
     /// Resolve a project from a directory path.

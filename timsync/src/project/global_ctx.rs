@@ -50,10 +50,9 @@ impl GlobalContextBuilder {
     /// Build the Tera context from the loaded data.
     ///
     /// returns: Context
-    pub fn build(&self) -> tera::Context {
+    pub fn build(&self) -> Value {
         let mut res: Map<String, Value> = Map::new();
         res.insert("site".to_string(), Value::Object(self.global_data.clone()));
-        let ctx = tera::Context::from_value(Value::Object(res)).unwrap();
-        ctx
+        Value::Object(res)
     }
 }

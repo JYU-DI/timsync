@@ -6,12 +6,12 @@ use lazy_regex::regex;
 use markdown::mdast::{Node, Root, Yaml};
 use markdown::{Constructs, ParseOptions};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha1::Digest;
 use sha1::Sha1;
 use url::{ParseError, Url};
 
-use crate::util::templating::TeraExt;
+use crate::util::templating::ExtendableContext;
 
 /// A single Markdown document in the project
 pub struct MarkdownDocument {
@@ -153,8 +153,8 @@ impl MarkdownDocument {
         &self,
         project_dir: &Path,
         root_url: &String,
-        global_context: Option<&tera::Context>,
-        tera: Option<&tera::Tera>,
+        global_context: Option<&handlebars::Context>,
+        renderer: &handlebars::Handlebars,
     ) -> Result<PreparedMarkdown> {
         let mut res = self.contents.clone();
         let mut start_offset = 0isize;
@@ -204,24 +204,18 @@ impl MarkdownDocument {
             }
         }
 
-        let mut ctx = tera::Context::new();
+        let mut ctx = handlebars::Context::wraps(json!("{}")).unwrap();
         if let Some(global_context) = global_context {
-            ctx.extend(global_context.clone());
+            ctx.extend_with_json(global_context.data());
         }
-        let front_matter_ctx = self
-            .front_matter_json()
-            .and_then(|fm| tera::Context::from_value(fm).ok());
+        let front_matter_ctx = self.front_matter_json();
         if let Some(front_matter_ctx) = front_matter_ctx {
-            ctx.extend(front_matter_ctx);
+            ctx.extend_with_json(&front_matter_ctx);
         }
-
-        let mut tera = tera
-            .map(|tera| tera.clone()) // TODO: Remove clone by editing tera
-            .unwrap_or_else(|| tera::Tera::default().with_tim_templates());
 
         // Init default tera instance if none is given
-        res = tera
-            .render_str(&res, &ctx)
+        res = renderer
+            .render_template_with_context(&res, &ctx)
             .with_context(|| format!("Could not render markdown file {}", self.path.display()))?;
 
         Ok(res.into())
