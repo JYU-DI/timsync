@@ -28,13 +28,13 @@ This is a link: [Testi](test_other_file)
 
 This is a template value: {{ 2 }}
 
-{{area "test"}}
+area "test"
 
 This is an area!
 
 **wew**
 
-{{/area}}
+/area
 
 ## Hello, more text!
 

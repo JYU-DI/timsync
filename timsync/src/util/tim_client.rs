@@ -53,7 +53,7 @@ pub struct ItemInfo {
     pub lang_id: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 // TIM item type
 pub enum ItemType {
@@ -265,6 +265,51 @@ impl TimClient {
                 }
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Create a new item (document or folder) in TIM, or update the title if it already exists.
+    /// Returns information about the item.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_type`: Item type to create.
+    /// * `path`: Full path to the new item, e.g. `kurssit/tie/kurssi`.
+    /// * `title`: Human-readable title for the item.
+    ///
+    /// returns: Result<ItemInfo, Error>
+    pub async fn create_or_update_item(
+        &self,
+        item_type: ItemType,
+        path: &str,
+        title: &str,
+    ) -> Result<ItemInfo> {
+        let item_info = self.get_item_info(&path).await;
+        match item_info {
+            Ok(info) => {
+                if info.item_type == item_type {
+                    self.set_item_title(&path, title).await?;
+                    Ok(info)
+                } else {
+                    Err(TimClientErrors::InvalidItemType(
+                        path.to_string(),
+                        item_type.to_string(),
+                        info.item_type.to_string(),
+                    )
+                    .into())
+                }
+            }
+            Err(e) => {
+                match e.downcast_ref::<TimClientErrors>() {
+                    Some(TimClientErrors::ItemNotFound(_, _)) => {
+                        // Item does not exist, create it
+                        self.create_item(item_type, &path, title).await?;
+                        let item_info = self.get_item_info(&path).await?;
+                        Ok(item_info)
+                    }
+                    _ => Err(e),
+                }
+            }
         }
     }
 

@@ -4,10 +4,9 @@ use anyhow::Context;
 use glob::glob;
 use simplelog::warn;
 
-use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
-use crate::project::global_ctx::{GlobalContextBuilder, GLOBAL_DATA_CONFIG_FILE};
+use crate::project::config::{CONFIG_FILE_NAME, CONFIG_FOLDER, SyncConfig};
+use crate::project::global_ctx::{GLOBAL_DATA_CONFIG_FILE, GlobalContextBuilder};
 use crate::util::path::Relativize;
-use crate::util::templating::TimRendererExt;
 
 /// A TIMSync project
 ///
@@ -46,48 +45,11 @@ impl Project {
         Ok(builder.build())
     }
 
-    /// Get the Tera templating engine for the project.
+    /// Get the template files in the project.
     ///
-    /// This includes the TIM templates from _templates folder.
+    /// The template files are read from the `_templates` folder in the project's root folder.
     ///
-    /// returns: Result<Tera, Error>
-    pub fn get_templating_engine(&self) -> anyhow::Result<handlebars::Handlebars> {
-        let template_folder = self.root_path.join(TEMPLATE_FOLDER);
-
-        let mut renderer = handlebars::Handlebars::new();
-
-        if template_folder.is_dir() {
-            let glob_pattern = template_folder.join("**").join("*");
-            for entry in glob(glob_pattern.to_string_lossy().as_ref()).with_context(|| {
-                format!(
-                    "Could not find templates from folder {}",
-                    template_folder.display()
-                )
-            })? {
-                match entry {
-                    Ok(path) => {
-                        if path.is_file() {
-                            // Get path without the template folder prefix
-                            let relative = path.relativize(&template_folder);
-                            let template_name = relative.to_string_lossy().replace("\\", "/");
-                            renderer
-                                .register_template_file(&template_name, &path)
-                                .with_context(|| {
-                                    format!(
-                                        "Could not register the template file {}",
-                                        path.display()
-                                    )
-                                })?;
-                        }
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-
-        Ok(renderer.with_tim_templates())
-    }
-    
+    /// returns: Result<Vec<(String, PathBuf)>, Error>
     pub fn get_template_files(&self) -> anyhow::Result<Vec<(String, PathBuf)>> {
         let template_folder = self.root_path.join(TEMPLATE_FOLDER);
         let mut files = Vec::new();

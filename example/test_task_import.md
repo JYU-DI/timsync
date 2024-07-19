@@ -17,7 +17,9 @@ Needed parameters:
 > TODO: The `doc` must be a docId for now. In the future, it can be a relative path in which case the ID would be
 > automatically resolved.
 
+{{{{raw}}}}
 {{ref site.tasks_doc "task1"}}
+{{{{/raw}}}}
 
 ## Importing using the `task` function
 
@@ -31,8 +33,8 @@ The only available parameters:
 - The task is defined in this project using the identifier above.
 - The function automatically handles creating the relevant references and generating a task.
 
-{{{raw}}}
+{{{{raw}}}}
 
 {{task "task1"}}
 
-{{{/raw}}}
+{{{{/raw}}}}
