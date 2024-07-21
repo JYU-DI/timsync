@@ -96,7 +96,7 @@ impl<'a> SyncPipeline<'a> {
             project,
             processors: HashMap::from([(
                 FileProcessorType::Markdown,
-                FileProcessor::Markdown(MarkdownProcessor::new(project, sync_target)?),
+                MarkdownProcessor::new(project, sync_target)?.into(),
             )]),
             sync_target,
             progress,

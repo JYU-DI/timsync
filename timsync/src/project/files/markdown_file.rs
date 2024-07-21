@@ -10,7 +10,7 @@ use crate::project::files::project_files::ProjectFileAPI;
 
 pub struct MarkdownFile {
     path: PathBuf,
-    contents: Lazy<anyhow::Result<String>>,
+    contents: Lazy<Result<String>>,
     front_matter_position: Lazy<Option<(usize, usize)>>,
 }
 

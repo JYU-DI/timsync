@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use enum_dispatch::enum_dispatch;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -9,6 +10,8 @@ use crate::project::files::markdown_file::MarkdownFile;
 
 /// Enum representing the different types of project files.
 /// Used as an abstraction over all available project file implementations.
+/// The specific implementation of each file type is declared in a separate file.
+#[enum_dispatch(ProjectFileAPI)]
 pub enum ProjectFile {
     /// Markdown file.
     Markdown(MarkdownFile),
@@ -25,12 +28,13 @@ impl TryFrom<PathBuf> for ProjectFile {
             .ok_or(anyhow::anyhow!("Could not convert extension to string"))?;
 
         match ext {
-            "md" => Ok(ProjectFile::Markdown(MarkdownFile::new(path))),
+            "md" => Ok(MarkdownFile::new(path).into()),
             _ => Err(anyhow::anyhow!("No matching file for extension: {}", ext)),
         }
     }
 }
 
+#[enum_dispatch]
 /// Public API for the project files.
 pub trait ProjectFileAPI {
     /// Get the path of the project file.
@@ -41,32 +45,6 @@ pub trait ProjectFileAPI {
     fn contents(&self) -> Result<&str>;
     /// Get the processor type to use for the project file.
     fn processor_type(&self) -> FileProcessorType;
-}
-
-impl ProjectFileAPI for ProjectFile {
-    fn path(&self) -> &PathBuf {
-        match self {
-            ProjectFile::Markdown(file) => file.path(),
-        }
-    }
-
-    fn front_matter_pos(&self) -> Option<(usize, usize)> {
-        match self {
-            ProjectFile::Markdown(file) => file.front_matter_pos(),
-        }
-    }
-
-    fn contents(&self) -> Result<&str> {
-        match self {
-            ProjectFile::Markdown(file) => file.contents(),
-        }
-    }
-
-    fn processor_type(&self) -> FileProcessorType {
-        match self {
-            ProjectFile::Markdown(file) => file.processor_type(),
-        }
-    }
 }
 
 impl dyn ProjectFileAPI {

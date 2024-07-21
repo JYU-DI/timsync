@@ -1,4 +1,5 @@
 use anyhow::Result;
+use enum_dispatch::enum_dispatch;
 
 use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
@@ -17,12 +18,14 @@ pub enum FileProcessorType {
 /// Used as abstraction over all available file processor implementations.
 ///
 /// Dispatches calls to the correct processor implementation based on the enum variant.
+#[enum_dispatch(FileProcessorAPI, FileProcessorRenderAPI)]
 pub enum FileProcessor<'a> {
     /// Markdown file processor.
     Markdown(MarkdownProcessor<'a>),
 }
 
 /// Public API for the file processors.
+#[enum_dispatch]
 pub trait FileProcessorAPI {
     /// Add a file to the processor.
     /// The file is registered to the processor.
@@ -42,6 +45,7 @@ pub trait FileProcessorAPI {
 }
 
 /// Private rendering API for the file processors. Used by the TIMDocument to render the Markdown.
+#[enum_dispatch]
 pub(in crate::processing) trait FileProcessorRenderAPI {
     /// Render a TIM document.
     ///
@@ -53,24 +57,24 @@ pub(in crate::processing) trait FileProcessorRenderAPI {
     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown>;
 }
 
-impl<'a> FileProcessorAPI for FileProcessor<'a> {
-    fn add_file(&mut self, file: ProjectFile) -> Result<()> {
-        match self {
-            FileProcessor::Markdown(processor) => processor.add_file(file),
-        }
-    }
-
-    fn get_tim_documents(&self) -> Vec<TIMDocument> {
-        match self {
-            FileProcessor::Markdown(processor) => processor.get_tim_documents(),
-        }
-    }
-}
-
-impl<'a> FileProcessorRenderAPI for FileProcessor<'a> {
-    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
-        match self {
-            FileProcessor::Markdown(processor) => processor.render_tim_document(tim_document),
-        }
-    }
-}
+// impl<'a> FileProcessorAPI for FileProcessor<'a> {
+//     fn add_file(&mut self, file: ProjectFile) -> Result<()> {
+//         match self {
+//             FileProcessor::Markdown(processor) => processor.add_file(file),
+//         }
+//     }
+//
+//     fn get_tim_documents(&self) -> Vec<TIMDocument> {
+//         match self {
+//             FileProcessor::Markdown(processor) => processor.get_tim_documents(),
+//         }
+//     }
+// }
+//
+// impl<'a> FileProcessorRenderAPI for FileProcessor<'a> {
+//     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
+//         match self {
+//             FileProcessor::Markdown(processor) => processor.render_tim_document(tim_document),
+//         }
+//     }
+// }
