@@ -89,6 +89,10 @@ The main syncing pipeline is implemented in `SyncPipeline` struct:
 
 <https://github.com/JYU-DI/timsync/blob/ce4f0e1086cf5cdd61025ecbef537edf80285181/timsync/src/commands/sync.rs#L77-L82>
 
+The actual link between project file types and file processors is defined in `SyncPipeline::new`:
+
+<https://github.com/JYU-DI/timsync/blob/ce4f0e1086cf5cdd61025ecbef537edf80285181/timsync/src/commands/sync.rs#L94-L104>
+
 In general, the syncing pipeline is as follows:
 
 1. Go through all files in the project directory
