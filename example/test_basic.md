@@ -28,13 +28,20 @@ This is a link: [Testi](test_other_file)
 
 This is a template value: {{ 2 }}
 
-area "test"
-
+{{#area "test"}}
 This is an area!
-
 **wew**
+{{/area}}
 
-/area
+{{#area collapse=true}}
+**Collapsible area!**
+{{else}}
+Area content!
+{{/area}}
+
+This is an area reference:
+
+{{ref_area doc_id "test"}}
 
 ## Hello, more text!
 

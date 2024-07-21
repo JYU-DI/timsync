@@ -1,60 +1,131 @@
+use handlebars::{
+    Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, Renderable,
+    RenderContext, RenderErrorReason,
+};
+use nanoid::nanoid;
 use serde_json::Value;
 
-// fn area_filter(value: &Value, args: &HashMap<String, Value>) -> Result<Value> {
-//     match value {
-//         Value::String(s) => {
-//             let area = args.get("name").ok_or("area name is missing")?;
-//             let area_name = area.as_str().ok_or("area name is not a string")?;
-//             let is_collapsible = args
-//                 .get("collapse")
-//                 .map(|v| v.as_bool().unwrap_or(false))
-//                 .unwrap_or(false);
-//             let collapse = if is_collapsible {
-//                 "collapse=\"true\""
-//             } else {
-//                 ""
-//             };
-//             Ok(Value::String(format!(
-//                 "#- {{area=\"{}\" {}}}\n{}\n#- {{area_end=\"{}\"}}",
-//                 area_name, collapse, s, area_name
-//             )))
-//         }
-//         _ => Err(Error::msg("area filter only works on strings")),
-//     }
-// }
+/// Area block helper.
+///
+/// Example:
+/// ```
+/// {{#area}}
+/// Areas can also be unnamed. In that case, the area name is generated using a random UUID.
+/// {{/area}}
+///
+/// {{#area "content-example"}}
+/// This is the content area.
+/// {{/area}}
+///
+/// {{#area "collapse-example" collapse=true}}
+/// Collapse button contents
+/// {{else}}
+/// Collapsed contents
+/// {{/area}}
+/// ```
+fn area_block<'reg, 'rc>(
+    h: &Helper<'rc>,
+    r: &'reg Handlebars<'reg>,
+    ctx: &'rc Context,
+    rc: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let area_name = match h.param(0) {
+        Some(v) => match v.value() {
+            Value::String(s) => s.clone(),
+            _ => {
+                return Err(RenderErrorReason::ParamTypeMismatchForName(
+                    "name",
+                    "0".to_string(),
+                    "string".to_string(),
+                )
+                .into())
+            }
+        },
+        None => format!("area-{}", nanoid!(8)),
+    };
 
-// fn ref_function(args: &HashMap<String, Value>) -> Result<Value> {
-//     let doc_arg = args.get("doc").ok_or("doc argument is missing")?;
-//     // TODO: Make area argument optional
-//     let area_arg = args.get("area").ok_or("area argument is missing")?;
-//
-//     let doc_id = match doc_arg {
-//         Value::String(_) => Err(Error::msg("string document is not yet supported")),
-//         Value::Number(n) => Ok(n
-//             .as_u64()
-//             .ok_or("document ID must be a non-negative integer")?),
-//         _ => Err(Error::msg("document ID must be a non-negative integer")),
-//     }?;
-//     let area = match area_arg {
-//         Value::String(s) => Ok(s),
-//         _ => Err(Error::msg("area name must be a string")),
-//     }?;
-//
-//     Ok(Value::String(format!(
-//         "#- {{rd=\"{}\" ra=\"{}\"}}",
-//         doc_id, area
-//     )))
-// }
+    let collapse = h
+        .hash_get("collapse")
+        .map(|v| v.value().is_truthy(true))
+        .unwrap_or(false);
 
-// lazy_static! {
-//     static ref TIM_TEMPLATES: Tera = {
-//         let mut tera = Tera::default();
-//         tera.register_filter("area", area_filter);
-//         tera.register_function("ref", ref_function);
-//         tera
-//     };
-//     static ref EMPTY_CONTEXT: Context = Context::new();
-// }
+    out.write(&format!(
+        "#- {{area=\"{}\" {}}}\n",
+        area_name,
+        if collapse { "collapse=\"true\"" } else { "" }
+    ))?;
+
+    if let Some(tmpl) = h.template() {
+        tmpl.render(r, ctx, rc, out)?;
+    }
+
+    if let Some(tmpl) = h.inverse() {
+        out.write("#-\n")?;
+        tmpl.render(r, ctx, rc, out)?;
+    }
+
+    out.write(&format!("#- {{area_end=\"{}\"}}", area_name))?;
+
+    Ok(())
+}
+
+/// Reference area helper.
+///
+/// Example:
+///
+/// ```
+/// {{#area "area-example"}}
+/// This is the content area.
+/// {{/area}}
+///
+/// This is a reference to the area within the same document:
+///
+/// {{ref_area doc_id "area-example"}}
+///
+/// Note that the ref_area requires the document ID and the area name.
+/// ```
+fn ref_area_helper<'reg, 'rc>(
+    h: &Helper<'rc>,
+    _: &'reg Handlebars<'reg>,
+    _: &'rc Context,
+    _: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let doc_id_param = h
+        .param(0)
+        .ok_or_else(|| RenderErrorReason::ParamNotFoundForIndex("doc_id", 0))?;
+
+    let doc_id = match doc_id_param.value() {
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.parse::<u64>().ok(),
+        _ => None,
+    }
+    .ok_or_else(|| {
+        RenderErrorReason::ParamTypeMismatchForName(
+            "doc_id",
+            "0".to_string(),
+            "non-negative integer".to_string(),
+        )
+    })?;
+
+    let area_name = h
+        .param(1)
+        .ok_or_else(|| RenderErrorReason::ParamNotFoundForIndex("area_name", 1))?
+        .value()
+        .as_str()
+        .ok_or_else(|| {
+            RenderErrorReason::ParamTypeMismatchForName(
+                "area_name",
+                "1".to_string(),
+                "string".to_string(),
+            )
+        })?;
+
+    out.write(&format!("#- {{rd=\"{}\" ra=\"{}\"}}", doc_id, area_name))?;
+
+    Ok(())
+}
 
 pub trait TimRendererExt {
     /// Extend the renderer instance with the TIM templates.
@@ -63,9 +134,11 @@ pub trait TimRendererExt {
     fn with_tim_templates(self) -> Self;
 }
 
-impl TimRendererExt for handlebars::Handlebars<'_> {
+impl TimRendererExt for Handlebars<'_> {
     fn with_tim_templates(mut self) -> Self {
         self.register_escape_fn(handlebars::no_escape);
+        self.register_helper("area", Box::new(area_block));
+        self.register_helper("ref_area", Box::new(ref_area_helper));
         handlebars_misc_helpers::register(&mut self);
         self
     }

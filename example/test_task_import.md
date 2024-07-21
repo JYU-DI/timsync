@@ -18,7 +18,7 @@ Needed parameters:
 > automatically resolved.
 
 {{{{raw}}}}
-{{ref site.tasks_doc "task1"}}
+{{ref-area "test_basic" area="test"}}
 {{{{/raw}}}}
 
 ## Importing using the `task` function

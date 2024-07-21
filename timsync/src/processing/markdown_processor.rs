@@ -118,9 +118,9 @@ impl<'a> MarkdownProcessor<'a> {
     }
 
     /// Rewrite relative URLs in the Markdown document into absolute TIM URLs.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `contents` - The contents of the Markdown document.
     /// * `project_dir` - The root directory of the project.
     /// * `proj_file_path` - The path of the Markdown file.
