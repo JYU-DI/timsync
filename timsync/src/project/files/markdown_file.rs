@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use lazy_init::Lazy;
 use markdown::{Constructs, ParseOptions};
 use markdown::mdast::{Node, Root};
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::project_files::ProjectFileAPI;
+use crate::project::files::util::{get_or_read_file_contents, get_or_set_front_matter_position};
 
 pub struct MarkdownFile {
     path: PathBuf,
@@ -20,40 +21,11 @@ impl ProjectFileAPI for MarkdownFile {
     }
 
     fn front_matter_pos(&self) -> Option<(usize, usize)> {
-        let res = self.front_matter_position.get_or_create(|| {
-            let mdast = self.md_ast();
-            match mdast {
-                Ok(mdast) => {
-                    let res = mdast.children.iter().find(|node| match node {
-                        Node::Yaml(_) => true,
-                        _ => false,
-                    });
-
-                    match res {
-                        Some(Node::Yaml(yaml)) => Some((
-                            yaml.position.as_ref().unwrap().start.offset,
-                            yaml.position.as_ref().unwrap().end.offset,
-                        )),
-                        _ => None,
-                    }
-                }
-                Err(_) => None,
-            }
-        });
-
-        res.clone()
+        get_or_set_front_matter_position(&self.contents, &self.front_matter_position, "---", "---")
     }
 
-    fn contents(&self) -> anyhow::Result<&str> {
-        let res = self.contents.get_or_create(|| {
-            std::fs::read_to_string(&self.path)
-                .with_context(|| format!("Could not read file: {}", self.path.display()))
-        });
-
-        match res {
-            Ok(contents) => Ok(contents.as_str()),
-            Err(err) => Err(anyhow::anyhow!(format!("{}", err))),
-        }
+    fn contents(&self) -> Result<&str> {
+        get_or_read_file_contents(&self.path, &self.contents)
     }
 
     fn processor_type(&self) -> FileProcessorType {
@@ -97,11 +69,6 @@ impl MarkdownFile {
     }
 
     pub fn md_ast(&self) -> Result<Root> {
-        let contents = self.contents()?;
-        self.get_md_ast(contents)
-    }
-
-    pub fn md_ast_contents_only(&self) -> Result<Root> {
         let api: &dyn ProjectFileAPI = self;
         let contents = api.contents_without_front_matter()?;
         self.get_md_ast(contents)

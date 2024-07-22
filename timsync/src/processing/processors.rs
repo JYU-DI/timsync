@@ -6,7 +6,7 @@ use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::ProjectFile;
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Hash, Eq, PartialEq, Copy, Clone)]
 /// Enum representing the different types of file processors.
 /// Used to determine which processor to use for a given file.
 pub enum FileProcessorType {

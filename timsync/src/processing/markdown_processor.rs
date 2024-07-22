@@ -107,7 +107,7 @@ impl<'a> MarkdownProcessor<'a> {
             }
         }
 
-        let mdast = md_file.md_ast_contents_only().unwrap();
+        let mdast = md_file.md_ast().unwrap();
 
         find_impl(&mut result, &mdast.children);
 

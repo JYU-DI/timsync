@@ -22,7 +22,7 @@ impl TryFrom<PathBuf> for ProjectFile {
 
     fn try_from(path: PathBuf) -> std::result::Result<Self, Self::Error> {
         let ext = path
-            .extension()
+            .full_extension()
             .ok_or(anyhow::anyhow!("No extension"))?
             .to_str()
             .ok_or(anyhow::anyhow!("Could not convert extension to string"))?;

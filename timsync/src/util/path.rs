@@ -51,3 +51,41 @@ impl WithSetExtension for PathBuf {
         self
     }
 }
+
+pub trait FullExtension {
+    fn full_extension(&self) -> Option<&OsStr>;
+}
+
+// Yanked from Rust core as it is not public API.
+fn split_file_at_dot(file: &OsStr) -> (&OsStr, Option<&OsStr>) {
+    let slice = file.as_encoded_bytes();
+    if slice == b".." {
+        return (file, None);
+    }
+
+    // The unsafety here stems from converting between &OsStr and &[u8]
+    // and back. This is safe to do because (1) we only look at ASCII
+    // contents of the encoding and (2) new &OsStr values are produced
+    // only from ASCII-bounded slices of existing &OsStr values.
+    let i = match slice[1..].iter().position(|b| *b == b'.') {
+        Some(i) => i + 1,
+        None => return (file, None),
+    };
+    let before = &slice[..i];
+    let after = &slice[i + 1..];
+    unsafe {
+        (
+            OsStr::from_encoded_bytes_unchecked(before),
+            Some(OsStr::from_encoded_bytes_unchecked(after)),
+        )
+    }
+}
+
+impl FullExtension for PathBuf {
+    /// Get the full extension of the path. That is, all parts after the first dot.
+    ///
+    /// returns: String
+    fn full_extension(&self) -> Option<&OsStr> {
+        self.file_name().map(split_file_at_dot).and_then(|(_, after)| after)
+    }
+}
