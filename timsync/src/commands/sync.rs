@@ -1,4 +1,6 @@
+use std::cell::OnceCell;
 use std::collections::{HashMap, LinkedList};
+use std::rc::Rc;
 use std::time::Duration;
 
 use anyhow::{Context, Error, Result};
@@ -6,6 +8,7 @@ use clap::Args;
 use futures::future::try_join_all;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use itertools::Itertools;
+use serde_json::{json, Map, Value};
 use simplelog::__private::paris::LogIcon;
 use simplelog::info;
 use thiserror::Error;
@@ -15,6 +18,7 @@ use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::processors::{FileProcessor, FileProcessorAPI, FileProcessorType};
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
+use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
 
@@ -76,6 +80,7 @@ enum ItemEntries<'a> {
 /// TODO: Perhaps refactor into a proper pipeline pattern (using enums) to ensure order in which pipeline steps execute.
 struct SyncPipeline<'a> {
     project: &'a Project,
+    global_context: Rc<OnceCell<GlobalContext>>,
     sync_target: &'a str,
     processors: HashMap<FileProcessorType, FileProcessor<'a>>,
     progress: MultiProgress,
@@ -92,19 +97,21 @@ impl<'a> SyncPipeline<'a> {
     ///
     /// returns: Result<SyncPipeline<'a>, Error>
     fn new(project: &'a Project, sync_target: &'a str, progress: MultiProgress) -> Result<Self> {
+        let global_context = Rc::new(OnceCell::new());
         Ok(SyncPipeline {
             project,
             processors: HashMap::from([(
                 FileProcessorType::Markdown,
-                MarkdownProcessor::new(project, sync_target)?.into(),
+                MarkdownProcessor::new(project, sync_target, global_context.clone())?.into(),
             )]),
             sync_target,
             progress,
+            global_context,
         })
     }
 
     /// Step 1: Collect all files in the project and add them to the relevant processors.
-    fn collect_files(&mut self) -> Result<()> {
+    fn collect_tim_documents(&mut self) -> Result<()> {
         let progress = self.progress.add(ProgressBar::new_spinner());
         progress.set_message("Collecting files");
         progress.enable_steady_tick(Duration::from_millis(100));
@@ -133,7 +140,7 @@ impl<'a> SyncPipeline<'a> {
         Ok(())
     }
 
-    /// Step 2: Resolve the final TIM documents that will be created from the processors.
+    /// Step 3: Collect all documents from the processors.
     fn get_tim_documents(&self) -> Vec<TIMDocument> {
         self.processors
             .values()
@@ -316,11 +323,53 @@ impl<'a> SyncPipeline<'a> {
             .collect())
     }
 
-    /// Step 4: Generate documents content and sync them with TIM.
+    /// Step 4: Update project context to include a full list of documents with their IDs.
+    fn update_project_context(&self, documents: &Vec<TIMDocument<'a>>) -> Result<()> {
+        let mut uid_to_info_map = Map::new();
+        let mut all_documents_infos = Vec::new();
+
+        for doc in documents {
+            let meta = doc.general_metadata()?;
+
+            let doc_info = json!({
+               "doc_id": doc.id,
+                "path": doc.path,
+                "title": doc.title
+            });
+
+            if let Some(doc_uid) = meta.uid {
+                uid_to_info_map.insert(doc_uid, doc_info.clone());
+            }
+
+            all_documents_infos.push(doc_info.clone());
+        }
+
+        let mut global_context = self.project.global_context()?;
+        global_context.insert("doc", Value::Object(uid_to_info_map));
+        global_context.insert("docs", Value::Array(all_documents_infos));
+
+        let sync_target = self.project.config.get_target(self.sync_target).unwrap();
+        global_context.insert("host", Value::String(sync_target.host.clone()));
+        global_context.insert("base_path", Value::String(sync_target.folder_root.clone()));
+
+        for (_, processor) in &self.processors {
+            if let Some(context) = processor.get_processor_context() {
+                global_context.extend(context);
+            }
+        }
+
+        self.global_context
+            .set(global_context)
+            .expect("Global context was already set, this should not happen");
+
+        Ok(())
+    }
+
+    /// Step 5: Generate documents content and sync them with TIM.
     async fn sync_tim_documents_contents(
         &self,
         client: &TimClient,
-        documents: Vec<TIMDocument<'_>>,
+        documents: Vec<TIMDocument<'a>>,
     ) -> Result<()> {
         let progress = self.progress.add(ProgressBar::new_spinner());
         progress.set_message("Uploading document contents to TIM");
@@ -343,7 +392,7 @@ impl<'a> SyncPipeline<'a> {
 
             progress_bar.set_message(format!("Uploading document: {}", doc_path));
 
-            let doc_markdown = doc.get_contents()?;
+            let doc_markdown = doc.render_contents()?;
             let current_doc_markdown = client.download_markdown(&doc_path).await?;
 
             if doc_markdown.timestamp_equals(&current_doc_markdown) {
@@ -426,9 +475,10 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
     tick_progress.set_message("Uploading project");
 
     let mut pipeline = SyncPipeline::new(&project, &opts.target, multi_progress)?;
-    pipeline.collect_files()?;
+    pipeline.collect_tim_documents()?;
     let documents = pipeline.get_tim_documents();
     let documents = pipeline.create_tim_documents(&client, documents).await?;
+    pipeline.update_project_context(&documents)?;
     pipeline
         .sync_tim_documents_contents(&client, documents)
         .await?;

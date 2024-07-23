@@ -29,8 +29,9 @@ pub enum TimClientErrors {
     ItemError(String, String),
 }
 
-#[derive(Deserialize)]
 /// Information about a TIM item (e.g., document or folder)
+#[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct ItemInfo {
     /// Item ID
     pub id: u64,

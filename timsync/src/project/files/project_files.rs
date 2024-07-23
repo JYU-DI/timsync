@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::markdown_file::MarkdownFile;
+use crate::util::path::FullExtension;
 
 /// Enum representing the different types of project files.
 /// Used as an abstraction over all available project file implementations.
@@ -60,31 +61,29 @@ impl dyn ProjectFileAPI {
     }
 }
 
-// TODO: Do we need to even allow a custom processor?
 #[derive(Debug, Deserialize)]
-pub struct GeneralProjectFileSettings {
+pub struct GeneralProjectFileMetadata {
     pub processor: Option<String>,
+    pub uid: Option<String>,
 }
 
 impl ProjectFile {
-    // TODO: Is this needed?
-    #[allow(dead_code)]
-    pub fn read_general_settings(&self) -> Result<GeneralProjectFileSettings> {
-        let front_matter = self.front_matter();
-        match front_matter {
-            Ok(front_matter) => {
-                let settings: GeneralProjectFileSettings = serde_yaml::from_str(front_matter)
-                    .with_context(|| {
-                        format!(
-                            "Could not parse front matter of file: {}",
-                            self.path().display()
-                        )
-                    })
-                    .unwrap();
-                Ok(settings)
-            }
-            _ => Ok(GeneralProjectFileSettings { processor: None }),
-        }
+    pub fn read_general_metadata(&self) -> Result<GeneralProjectFileMetadata> {
+        let Ok(front_matter) = self.front_matter() else {
+            return Ok(GeneralProjectFileMetadata {
+                processor: None,
+                uid: None,
+            });
+        };
+        let settings: GeneralProjectFileMetadata = serde_yaml::from_str(front_matter)
+            .with_context(|| {
+                format!(
+                    "Could not parse front matter of file: {}",
+                    self.path().display()
+                )
+            })
+            .unwrap();
+        Ok(settings)
     }
 
     /// Get the front matter of the project file.

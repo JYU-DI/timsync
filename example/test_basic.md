@@ -14,6 +14,11 @@ This is include: {{> test_include.md }}
 
 This is a test from TIMSync!
 
+This is docid of another document: {{ site.doc.hello2.doc_id }}  
+This is path of another document: {{ site.doc.hello2.path }}
+
+Base path: {{ site.base_path }}
+
 ```
 %%wew%%
 ```

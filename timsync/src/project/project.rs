@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use glob::glob;
 use simplelog::warn;
 
 use crate::project::config::{CONFIG_FILE_NAME, CONFIG_FOLDER, SyncConfig};
-use crate::project::global_ctx::{GLOBAL_DATA_CONFIG_FILE, GlobalContextBuilder};
+use crate::project::global_ctx::{GLOBAL_DATA_CONFIG_FILE, GlobalContext};
 use crate::util::path::Relativize;
 
 /// A TIMSync project
@@ -14,7 +14,6 @@ use crate::util::path::Relativize;
 /// and a .timsync folder with the TIMSync config.
 pub struct Project {
     root_path: PathBuf,
-
     /// The TIMSync config for the project
     pub config: SyncConfig,
 }
@@ -28,21 +27,13 @@ impl Project {
     pub fn get_root_path(&self) -> &Path {
         &self.root_path
     }
-
-    /// Get the global context that contains the project's global data as JSON.
+    
+    /// Get the global context prefilled with data defined in the global data config file (`_config.yml`).
     ///
-    /// The global data is read from the `_config.yml` file in the project's root folder.
-    ///
-    /// returns: Result<Context, Error>
-    pub fn get_global_context_json(&self) -> anyhow::Result<serde_json::Value> {
-        let mut builder = GlobalContextBuilder::new();
-
-        let global_config_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
-        if global_config_path.is_file() {
-            builder.add_global_data(&global_config_path)?;
-        }
-
-        Ok(builder.build())
+    /// returns: Result<GlobalContext, Error> 
+    pub fn global_context(&self) -> Result<GlobalContext> {
+        let global_data_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
+        GlobalContext::for_project(&global_data_path)
     }
 
     /// Get the template files in the project.
@@ -50,7 +41,7 @@ impl Project {
     /// The template files are read from the `_templates` folder in the project's root folder.
     ///
     /// returns: Result<Vec<(String, PathBuf)>, Error>
-    pub fn get_template_files(&self) -> anyhow::Result<Vec<(String, PathBuf)>> {
+    pub fn get_template_files(&self) -> Result<Vec<(String, PathBuf)>> {
         let template_folder = self.root_path.join(TEMPLATE_FOLDER);
         let mut files = Vec::new();
 
@@ -92,7 +83,7 @@ impl Project {
     /// * `dir_path`: Directory to search the project from.
     ///
     /// returns: Result<Project, Error>
-    pub fn resolve_from_directory(dir_path: &Path) -> anyhow::Result<Self> {
+    pub fn resolve_from_directory(dir_path: &Path) -> Result<Self> {
         if !dir_path.is_dir() {
             return Err(anyhow::anyhow!(
                 "The given path is not a directory or does not exist: {}",

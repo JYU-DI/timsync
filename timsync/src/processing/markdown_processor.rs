@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -6,14 +7,17 @@ use anyhow::{Context, Result};
 use handlebars::Handlebars;
 use markdown::mdast::Node;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Map, Value};
 use url::{ParseError, Url};
 
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
-use crate::processing::processors::{FileProcessorAPI, FileProcessorRenderAPI};
+use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::markdown_file::MarkdownFile;
-use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
+use crate::project::files::project_files::{
+    GeneralProjectFileMetadata, ProjectFile, ProjectFileAPI,
+};
+use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 use crate::util::path::{Relativize, WithSetExtension};
 use crate::util::templating::{ExtendableContext, TimRendererExt};
@@ -53,6 +57,8 @@ pub struct MarkdownProcessor<'a> {
 
     /// Handlebars renderer to render the Markdown files.
     renderer: Handlebars<'a>,
+
+    global_context: Rc<OnceCell<GlobalContext>>,
 }
 
 /// Struct to store a link (relative or absolute) in a Markdown document.
@@ -67,7 +73,11 @@ impl<'a> MarkdownProcessor<'a> {
     /// * `sync_target` - Sync target to which the documents are being synced.
     ///
     /// Returns: MarkdownProcessor
-    pub fn new(project: &'a Project, sync_target: &str) -> Result<Self> {
+    pub fn new(
+        project: &'a Project,
+        sync_target: &str,
+        global_context: Rc<OnceCell<GlobalContext>>,
+    ) -> Result<Self> {
         let mut renderer = Handlebars::new().with_tim_templates();
         for (name, template) in project.get_template_files()? {
             renderer.register_template_file(&name, template)?;
@@ -77,6 +87,7 @@ impl<'a> MarkdownProcessor<'a> {
             project,
             sync_target: sync_target.to_string(),
             renderer,
+            global_context,
         })
     }
 
@@ -236,6 +247,10 @@ impl<'a> FileProcessorAPI for MarkdownProcessor<'a> {
         Ok(())
     }
 
+    fn get_processor_context(&self) -> Option<Map<String, Value>> {
+        None
+    }
+
     fn get_tim_documents(&self) -> Vec<TIMDocument> {
         self.files
             .values()
@@ -249,11 +264,11 @@ impl<'a> FileProcessorAPI for MarkdownProcessor<'a> {
     }
 }
 
-impl<'a> FileProcessorRenderAPI for MarkdownProcessor<'a> {
+impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
-        let info = self.files.get(tim_document.path).ok_or_else(|| {
-            anyhow::anyhow!("Could not find document with path: {}", tim_document.path)
-        })?;
+        // This unwrap is safe because the file was added to the processor
+        // Because internal API is only called by TIMDocument, the file should always exist
+        let info = self.files.get(tim_document.path).unwrap();
 
         let mut contents = info.proj_file.contents_without_front_matter()?.to_string();
         let project_dir = self.project.get_root_path();
@@ -277,7 +292,11 @@ impl<'a> FileProcessorRenderAPI for MarkdownProcessor<'a> {
             );
         }
 
-        let mut ctx = handlebars::Context::wraps(self.project.get_global_context_json()?).unwrap();
+        let mut ctx = self
+            .global_context
+            .get()
+            .expect("Global context was not initialized")
+            .handlebars_context();
         ctx.extend_with_json(&info.proj_file.front_matter_json()?);
         ctx.extend_with_json(&json!({
             "title": tim_document.title,
@@ -296,5 +315,15 @@ impl<'a> FileProcessorRenderAPI for MarkdownProcessor<'a> {
             })?;
 
         Ok(res.into())
+    }
+
+    fn get_project_file_metadata(
+        &self,
+        tim_document: &TIMDocument,
+    ) -> Result<GeneralProjectFileMetadata> {
+        // This unwrap is safe because the file was added to the processor
+        // Because internal API is only called by TIMDocument, the file should always exist
+        let info = self.files.get(tim_document.path).unwrap();
+        info.proj_file.read_general_metadata()
     }
 }

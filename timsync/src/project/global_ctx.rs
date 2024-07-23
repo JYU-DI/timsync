@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use serde_json::{Map, Value};
 
 /// The name of the global data config file
@@ -15,12 +15,14 @@ pub const DEFAULT_GLOBAL_DATA: &str = r#"#
 title: My TIM page
 "#;
 
-/// A builder for the global context
-pub struct GlobalContextBuilder {
+/// Global context that contains that is shared across all documents.
+/// Used primarily for templating, but can be used for sharing data between processors in general.
+#[derive(Debug)]
+pub struct GlobalContext {
     global_data: Map<String, Value>,
 }
 
-impl GlobalContextBuilder {
+impl GlobalContext {
     /// Create a new GlobalContextBuilder
     pub fn new() -> Self {
         Self {
@@ -28,6 +30,23 @@ impl GlobalContextBuilder {
         }
     }
 
+    /// Create a new GlobalContextBuilder and pre-load the global data from a YAML file.
+    ///
+    /// # Arguments
+    ///
+    /// * `global_config_path`: The path to the global data YAML file
+    ///
+    /// returns: Result<Self, Error>
+    pub fn for_project(global_config_path: &PathBuf) -> Result<Self> {
+        let mut builder = Self::new();
+
+        if global_config_path.is_file() {
+            builder.add_global_data(&global_config_path)?;
+        }
+
+        Ok(builder)
+    }
+    
     /// Load global site data from a YAML file.
     /// The date is merged with the existing site data.
     ///
@@ -36,10 +55,7 @@ impl GlobalContextBuilder {
     /// * `yaml_file`: The path to the YAML file to load
     ///
     /// returns: Result<&GlobalContextBuilder, Error>
-    pub fn add_global_data(
-        &mut self,
-        yaml_file: &PathBuf,
-    ) -> anyhow::Result<&GlobalContextBuilder> {
+    pub fn add_global_data(&mut self, yaml_file: &PathBuf) -> Result<&GlobalContext> {
         let yaml_str = std::fs::read_to_string(yaml_file)?;
         let yaml_data: Map<String, Value> = serde_yaml::from_str(&yaml_str)
             .context("Could not parse global data config as a YAML document.")?;
@@ -47,12 +63,35 @@ impl GlobalContextBuilder {
         Ok(self)
     }
 
-    /// Build the Tera context from the loaded data.
+    /// Add a value to the global data.
+    ///
+    /// # Arguments
+    ///
+    /// * `key`: The key of the value
+    /// * `value`: The value to add
+    ///
+    /// returns: ()
+    pub fn insert(&mut self, key: &str, value: Value) {
+        self.global_data.insert(key.to_string(), value);
+    }
+    
+    /// Extend the global data with a map of values.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `data`: The map of values to extend the global data with
+    /// 
+    /// returns: ()
+    pub fn extend(&mut self, data: Map<String, Value>) {
+        self.global_data.extend(data);
+    }
+
+    /// Convert the global data to a Handlebars context.
     ///
     /// returns: Context
-    pub fn build(&self) -> Value {
+    pub fn handlebars_context(&self) -> handlebars::Context {
         let mut res: Map<String, Value> = Map::new();
         res.insert("site".to_string(), Value::Object(self.global_data.clone()));
-        Value::Object(res)
+        handlebars::Context::wraps(Value::Object(res)).unwrap()
     }
 }

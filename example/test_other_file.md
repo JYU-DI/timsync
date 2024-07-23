@@ -1,4 +1,5 @@
 ---
+uid: hello2
 title: Hello 2!
 ---
 

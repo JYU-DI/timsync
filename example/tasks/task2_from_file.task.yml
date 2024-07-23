@@ -1,0 +1,22 @@
+---
+# An example of a task as defined via TIMSync
+# The below two options are handled by TIMSync and are mandatory
+uid: task2    # Global identifier for this file. Required for referencing. Must be unique, can contain any alphanumeric characters.
+
+plugin: csPlugin # Value used by `plugin` type to define what plugin to emit.
+
+# Any extra attributes that should be attached to the plugin
+plugin_attributes:
+  ideTask: task2
+---
+# The actual task definition
+# The contents of this YAML will be passed through the templating engine
+# and then sent to TIM.
+
+header: C# task with imported file
+stem: |
+  This is a description of the task.
+type: cs/comtest/doc
+filename: HelloWorld
+# Load the program from a file and insert it as an escaped string
+fullprogram: '{{read_from_file "HelloWorld.cs" escape=true}}'

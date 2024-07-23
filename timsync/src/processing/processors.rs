@@ -1,10 +1,11 @@
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
+use serde_json::{Map, Value};
 
 use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::tim_document::TIMDocument;
-use crate::project::files::project_files::ProjectFile;
+use crate::project::files::project_files::{GeneralProjectFileMetadata, ProjectFile};
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone)]
 /// Enum representing the different types of file processors.
@@ -12,6 +13,7 @@ use crate::project::files::project_files::ProjectFile;
 pub enum FileProcessorType {
     /// Markdown file processor.
     Markdown,
+    TaskPlugin,
 }
 
 /// Enum of the different file processors.
@@ -35,6 +37,12 @@ pub trait FileProcessorAPI {
     /// * `file` - The file to add to the processor.
     fn add_file(&mut self, file: ProjectFile) -> Result<()>;
 
+    /// Get additional context that should be included into project context.
+    /// The added context is can be used in templating in other processors.
+    ///
+    /// returns: Option<Map<String, Value>>
+    fn get_processor_context(&self) -> Option<Map<String, Value>>;
+
     /// Get information about the TIM documents that the processor produces.
     /// Depending on the processor, this list might contain different number of documents
     /// than the number of files added to the processor.
@@ -44,9 +52,9 @@ pub trait FileProcessorAPI {
     fn get_tim_documents(&self) -> Vec<TIMDocument>;
 }
 
-/// Private rendering API for the file processors. Used by the TIMDocument to render the Markdown.
+/// Private internal API for the file processors. Used by the TIMDocument to delegate calls to the processor.
 #[enum_dispatch]
-pub(in crate::processing) trait FileProcessorRenderAPI {
+pub(in crate::processing) trait FileProcessorInternalAPI {
     /// Render a TIM document.
     ///
     /// # Arguments
@@ -55,26 +63,9 @@ pub(in crate::processing) trait FileProcessorRenderAPI {
     ///
     /// returns: Result<PreparedDocumentMarkdown>
     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown>;
-}
 
-// impl<'a> FileProcessorAPI for FileProcessor<'a> {
-//     fn add_file(&mut self, file: ProjectFile) -> Result<()> {
-//         match self {
-//             FileProcessor::Markdown(processor) => processor.add_file(file),
-//         }
-//     }
-//
-//     fn get_tim_documents(&self) -> Vec<TIMDocument> {
-//         match self {
-//             FileProcessor::Markdown(processor) => processor.get_tim_documents(),
-//         }
-//     }
-// }
-//
-// impl<'a> FileProcessorRenderAPI for FileProcessor<'a> {
-//     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
-//         match self {
-//             FileProcessor::Markdown(processor) => processor.render_tim_document(tim_document),
-//         }
-//     }
-// }
+    fn get_project_file_metadata(
+        &self,
+        tim_document: &TIMDocument,
+    ) -> Result<GeneralProjectFileMetadata>;
+}
