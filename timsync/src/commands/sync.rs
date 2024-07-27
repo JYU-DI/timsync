@@ -16,6 +16,7 @@ use walkdir::WalkDir;
 
 use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::processors::{FileProcessor, FileProcessorAPI, FileProcessorType};
+use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
@@ -100,10 +101,16 @@ impl<'a> SyncPipeline<'a> {
         let global_context = Rc::new(OnceCell::new());
         Ok(SyncPipeline {
             project,
-            processors: HashMap::from([(
-                FileProcessorType::Markdown,
-                MarkdownProcessor::new(project, sync_target, global_context.clone())?.into(),
-            )]),
+            processors: HashMap::from([
+                (
+                    FileProcessorType::Markdown,
+                    MarkdownProcessor::new(project, sync_target, global_context.clone())?.into(),
+                ),
+                (
+                    FileProcessorType::TaskPlugin,
+                    TaskProcessor::new(project, global_context.clone())?.into(),
+                ),
+            ]),
             sync_target,
             progress,
             global_context,
@@ -351,6 +358,10 @@ impl<'a> SyncPipeline<'a> {
         let sync_target = self.project.config.get_target(self.sync_target).unwrap();
         global_context.insert("host", Value::String(sync_target.host.clone()));
         global_context.insert("base_path", Value::String(sync_target.folder_root.clone()));
+        global_context.insert(
+            "local_project_dir",
+            Value::String(self.project.get_root_path().display().to_string()),
+        );
 
         for (_, processor) in &self.processors {
             if let Some(context) = processor.get_processor_context() {

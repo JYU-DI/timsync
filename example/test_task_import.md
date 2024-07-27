@@ -14,8 +14,6 @@ The only available parameters:
 - The task is defined in this project using the identifier above.
 - The function automatically handles creating the relevant references and generating a task.
 
-{{{{raw}}}}
-
 # Examples
 
 ## Example 1: Basic task
@@ -26,4 +24,3 @@ The only available parameters:
 
 {{task "task2"}}
 
-{{{{/raw}}}}

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use rand::Rng;
 use reqwest::{Client, ClientBuilder, RequestBuilder};
 use serde::Deserialize;
 use serde_json::json;
@@ -456,4 +457,40 @@ impl TimClientBuilder {
         tim_client.refresh_xsrf_token().await?;
         Ok(tim_client)
     }
+}
+
+const GEN_ASCII_STR_CHARSET: &[u8] =
+    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const GEN_ASCII_STR_CHARSET_LEN: usize = GEN_ASCII_STR_CHARSET.len();
+
+pub fn random_par_id() -> String {
+    fn luhn_checksum(id: &str) -> usize {
+        let mut acc = 0;
+        let ascii_str = id.as_bytes();
+        for i in (0..id.len()).rev() {
+            let c = ascii_str[i];
+            let value = GEN_ASCII_STR_CHARSET.iter().position(|&x| x == c).unwrap();
+            acc += if i % 2 == 0 { value * 2 } else { value };
+        }
+        acc % GEN_ASCII_STR_CHARSET_LEN
+    }
+
+    fn id_checksum(id: &str) -> char {
+        let check_digit = luhn_checksum(&format!("{}{}", id, GEN_ASCII_STR_CHARSET[0] as char));
+        if check_digit == 0 {
+            GEN_ASCII_STR_CHARSET[0] as char
+        } else {
+            GEN_ASCII_STR_CHARSET[GEN_ASCII_STR_CHARSET_LEN - check_digit] as char
+        }
+    }
+
+    let mut rand = rand::thread_rng();
+    let random_id = (0..11)
+        .map(|_| {
+            let idx = rand.gen_range(0..GEN_ASCII_STR_CHARSET_LEN);
+            GEN_ASCII_STR_CHARSET[idx] as char
+        })
+        .collect::<String>();
+
+    format!("{}{}", random_id, id_checksum(&random_id))
 }

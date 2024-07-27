@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::markdown_file::MarkdownFile;
+use crate::project::files::yaml_file::YAMLFile;
 use crate::util::path::FullExtension;
 
 /// Enum representing the different types of project files.
@@ -16,6 +17,7 @@ use crate::util::path::FullExtension;
 pub enum ProjectFile {
     /// Markdown file.
     Markdown(MarkdownFile),
+    YAML(YAMLFile),
 }
 
 impl TryFrom<PathBuf> for ProjectFile {
@@ -30,6 +32,9 @@ impl TryFrom<PathBuf> for ProjectFile {
 
         match ext {
             "md" => Ok(MarkdownFile::new(path).into()),
+            "task.yaml" | "task.yml" => {
+                Ok(YAMLFile::new(path, FileProcessorType::TaskPlugin).into())
+            }
             _ => Err(anyhow::anyhow!("No matching file for extension: {}", ext)),
         }
     }
@@ -63,6 +68,8 @@ impl dyn ProjectFileAPI {
 
 #[derive(Debug, Deserialize)]
 pub struct GeneralProjectFileMetadata {
+    // TODO: Check if needed, technically we can allow any type to specify a custom processor
+    #[allow(dead_code)]
     pub processor: Option<String>,
     pub uid: Option<String>,
 }

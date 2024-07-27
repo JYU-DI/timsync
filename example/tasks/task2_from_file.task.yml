@@ -19,4 +19,4 @@ stem: |
 type: cs/comtest/doc
 filename: HelloWorld
 # Load the program from a file and insert it as an escaped string
-fullprogram: '{{read_from_file "HelloWorld.cs" escape=true}}'
+fullprogram: 'read_from_file "HelloWorld.cs" escape=true'

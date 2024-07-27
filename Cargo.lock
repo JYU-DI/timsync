@@ -1917,6 +1917,7 @@ dependencies = [
  "markdown",
  "nanoid",
  "path-absolutize",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",

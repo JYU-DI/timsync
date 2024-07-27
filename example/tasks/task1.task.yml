@@ -20,4 +20,4 @@ fullprogram: |
       Console.WriteLine("Hello, World!");
     }
   }
-# fullprogram: {{ import "HelloWorld.cs" }} # Load the contents of HelloWorld.cs during preprocessing
+# fullprogram: import "HelloWorld.cs"  # Load the contents of HelloWorld.cs during preprocessing

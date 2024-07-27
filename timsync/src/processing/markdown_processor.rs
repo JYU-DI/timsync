@@ -78,7 +78,7 @@ impl<'a> MarkdownProcessor<'a> {
         sync_target: &str,
         global_context: Rc<OnceCell<GlobalContext>>,
     ) -> Result<Self> {
-        let mut renderer = Handlebars::new().with_tim_templates();
+        let mut renderer = Handlebars::new().with_tim_doc_templates();
         for (name, template) in project.get_template_files()? {
             renderer.register_template_file(&name, template)?;
         }
@@ -302,6 +302,7 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
             "title": tim_document.title,
             "path": tim_document.path,
             "doc_id": tim_document.id.unwrap_or(0),
+            "local_file_path": proj_file_path.to_string_lossy(),
         }));
 
         let res = self
