@@ -76,6 +76,34 @@ fn area_block<'reg, 'rc>(
     Ok(())
 }
 
+/// Docsettings block helper.
+/// Surrounds the content into a docsettings block.
+///
+/// Example:
+///
+/// ```md
+///
+/// {{#docsettings}}
+/// foo: bar
+/// baz: qux
+/// {{/docsettings}}
+/// ```
+fn docsettings_block<'reg, 'rc>(
+    h: &Helper<'rc>,
+    r: &'reg Handlebars<'reg>,
+    ctx: &'rc Context,
+    rc: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> HelperResult {
+    out.write("``` {settings=\"\"}\n\n")?;
+    if let Some(tmpl) = h.template() {
+        tmpl.render(r, ctx, rc, out)?;
+    }
+    out.write("\n```\n\n")?;
+
+    Ok(())
+}
+
 /// Reference area helper.
 /// Inserts a reference to a named area in the same or another document.
 ///
@@ -247,14 +275,14 @@ where
 
     /// Extend the renderer instance with the project helpers.
     /// The helpers are used to extend the templating engine with custom scripts.
-    /// 
+    ///
     /// Helpers are scanned from the `_helpers` folder in a project.
     /// The helpers must be written in the Rhai scripting language (file extension `.rhai`).
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `project`: The project to get the helpers from.
-    /// 
+    ///
     /// returns: Result<Self, Error>
     fn with_project_helpers(self, project: &Project) -> Result<Self>;
 }
@@ -266,6 +294,7 @@ impl TimRendererExt for Handlebars<'_> {
     fn with_tim_doc_templates(mut self) -> Self {
         self.register_escape_fn(handlebars::no_escape);
         self.register_helper("area", Box::new(area_block));
+        self.register_helper("docsettings", Box::new(docsettings_block));
         self.register_helper("ref_area", Box::new(ref_area_helper));
         self.register_helper("task", Box::new(task_helper));
         handlebars_misc_helpers::register(&mut self);

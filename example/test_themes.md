@@ -2,9 +2,9 @@
 title: Theme test
 ---
 
-``` {settings=""}
-themes:
+{{#docsettings}}
+themes: 
   - {{site.style_themes.test_theme}}
-```
+{{/docsettings}}
 
 Testi!
