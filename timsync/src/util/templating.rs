@@ -1,6 +1,6 @@
 use handlebars::{
-    Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, Renderable,
-    RenderContext, RenderErrorReason,
+    Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext,
+    RenderErrorReason, Renderable,
 };
 use nanoid::nanoid;
 use serde_json::Value;

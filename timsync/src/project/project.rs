@@ -4,8 +4,8 @@ use anyhow::{Context, Result};
 use glob::glob;
 use simplelog::warn;
 
-use crate::project::config::{CONFIG_FILE_NAME, CONFIG_FOLDER, SyncConfig};
-use crate::project::global_ctx::{GLOBAL_DATA_CONFIG_FILE, GlobalContext};
+use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
+use crate::project::global_ctx::{GlobalContext, GLOBAL_DATA_CONFIG_FILE};
 use crate::util::path::RelativizeExtension;
 
 /// A TIMSync project

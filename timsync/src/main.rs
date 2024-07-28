@@ -3,8 +3,8 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{command, Parser, Subcommand};
 use shadow_rs::shadow;
-use simplelog::*;
 use simplelog::__private::paris::LogIcon;
+use simplelog::*;
 
 use commands::InitOptions;
 

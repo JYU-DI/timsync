@@ -85,7 +85,6 @@ fn split_file_at_dot(file: &OsStr) -> (&OsStr, Option<&OsStr>) {
 }
 
 impl FullExtension for PathBuf {
-    
     fn full_extension(&self) -> Option<&OsStr> {
         self.file_name()
             .map(split_file_at_dot)

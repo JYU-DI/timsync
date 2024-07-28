@@ -46,7 +46,7 @@ impl GlobalContext {
 
         Ok(builder)
     }
-    
+
     /// Load global site data from a YAML file.
     /// The date is merged with the existing site data.
     ///
@@ -74,13 +74,13 @@ impl GlobalContext {
     pub fn insert(&mut self, key: &str, value: Value) {
         self.global_data.insert(key.to_string(), value);
     }
-    
+
     /// Extend the global data with a map of values.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `data`: The map of values to extend the global data with
-    /// 
+    ///
     /// returns: ()
     pub fn extend(&mut self, data: Map<String, Value>) {
         self.global_data.extend(data);

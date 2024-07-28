@@ -71,7 +71,7 @@ pub(in crate::processing) trait FileProcessorInternalAPI {
     ///
     /// # Arguments
     /// * `tim_document` - The TIM document to get the metadata for.
-    /// 
+    ///
     /// returns: Result<GeneralProjectFileMetadata>
     fn get_project_file_metadata(
         &self,

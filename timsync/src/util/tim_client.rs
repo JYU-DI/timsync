@@ -463,7 +463,7 @@ impl TimClientBuilder {
 ///
 /// The generation code is based on the original TIM implementation:
 /// <https://github.com/TIM-JYU/TIM/blob/9ad39095a3d87c8a7300beb1edbf138abee60d55/timApp/document/randutils.py#L8-L45>
-/// 
+///
 /// returns: String
 pub fn random_par_id() -> String {
     const GEN_ASCII_STR_CHARSET: &[u8] =

@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use crate::project::config::{SyncTarget, DEFAULT_SYNC_TARGET_HOST};
 use anyhow::{Context, Result};
 use dialoguer::{Input, Password};
 use indicatif::ProgressBar;
 use simplelog::__private::paris::LogIcon;
 use simplelog::{error, info};
 
+use crate::project::config::{SyncTarget, DEFAULT_SYNC_TARGET_HOST};
 use crate::util::tim_client::TimClientBuilder;
 
 /// Create a new sync target by asking the user for details.

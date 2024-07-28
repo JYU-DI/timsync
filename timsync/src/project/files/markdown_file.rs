@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use lazy_init::Lazy;
-use markdown::{Constructs, ParseOptions};
 use markdown::mdast::{Node, Root};
+use markdown::{Constructs, ParseOptions};
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::project_files::ProjectFileAPI;
@@ -37,11 +37,11 @@ impl ProjectFileAPI for MarkdownFile {
 
 impl MarkdownFile {
     /// Create a new markdown file.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `path` - The path to the markdown file.
-    /// 
+    ///
     /// Returns: MarkdownFile
     pub fn new(path: PathBuf) -> Self {
         Self {
@@ -78,7 +78,7 @@ impl MarkdownFile {
     }
 
     /// Get the parsed markdown abstract syntax tree (AST) of the markdown file.
-    /// 
+    ///
     /// Returns: Result<Root>
     pub fn md_ast(&self) -> Result<Root> {
         let api: &dyn ProjectFileAPI = self;

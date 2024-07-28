@@ -17,12 +17,12 @@ pub struct YAMLFile {
 
 impl YAMLFile {
     /// Create a new YAML file.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `path` - The path to the YAML file.
     /// * `default_file_processor` - The default file processor to use for the file.
-    /// 
+    ///
     /// Returns: YAMLFile
     pub fn new(path: PathBuf, default_file_processor: FileProcessorType) -> Self {
         Self {
