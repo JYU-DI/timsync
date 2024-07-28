@@ -81,10 +81,11 @@ impl<'a> MarkdownProcessor<'a> {
         sync_target: &str,
         global_context: Rc<OnceCell<GlobalContext>>,
     ) -> Result<Self> {
-        let mut renderer = Handlebars::new().with_tim_doc_templates();
-        for (name, template) in project.get_template_files()? {
-            renderer.register_template_file(&name, template)?;
-        }
+        let renderer = Handlebars::new()
+            .with_tim_doc_templates()
+            .with_project_templates(project)?
+            .with_project_helpers(project)?;
+
         Ok(Self {
             files: HashMap::new(),
             project,

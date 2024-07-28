@@ -16,7 +16,7 @@ use crate::project::files::project_files::{
 };
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
-use crate::util::templating::ContextExtension;
+use crate::util::templating::{ContextExtension, TimRendererExt};
 use crate::util::tim_client::random_par_id;
 
 struct TaskInfo {
@@ -79,10 +79,9 @@ impl<'a> TaskProcessor<'a> {
     ///
     /// returns: Result<TaskProcessor>
     pub fn new(project: &'a Project, global_context: Rc<OnceCell<GlobalContext>>) -> Result<Self> {
-        let mut renderer = Handlebars::new();
-        for (name, template) in project.get_template_files()? {
-            renderer.register_template_file(&name, template)?;
-        }
+        let renderer = Handlebars::new()
+            .with_project_templates(project)?
+            .with_project_helpers(project)?;
 
         Ok(Self {
             files: HashMap::new(),

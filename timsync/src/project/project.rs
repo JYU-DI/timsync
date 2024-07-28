@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
-use glob::glob;
+use anyhow::Result;
 use simplelog::warn;
 
 use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
@@ -20,8 +19,6 @@ pub struct Project {
 
 const MAX_SEARCH_DEPTH: usize = 10;
 
-const TEMPLATE_FOLDER: &str = "_templates";
-
 impl Project {
     /// Get the root path of the project
     pub fn get_root_path(&self) -> &Path {
@@ -36,33 +33,30 @@ impl Project {
         GlobalContext::for_project(&global_data_path)
     }
 
-    /// Get the template files in the project.
-    ///
-    /// The template files are read from the `_templates` folder in the project's root folder.
-    ///
+    /// Find files in the project directory and its subdirectories.
+    /// Returns a list of URL-safe names and the full paths to the files.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `dir`: The directory to search for files in.
+    /// * `glob`: The glob pattern to match files against.
+    /// 
     /// returns: Result<Vec<(String, PathBuf)>, Error>
-    pub fn get_template_files(&self) -> Result<Vec<(String, PathBuf)>> {
-        let template_folder = self.root_path.join(TEMPLATE_FOLDER);
+    pub fn find_files(&self, dir: impl AsRef<Path>, glob: &str) -> Result<Vec<(String, PathBuf)>> {
+        let base_folder = self.root_path.join(dir);
         let mut files = Vec::new();
 
-        if template_folder.is_dir() {
-            let glob_pattern = template_folder.join("**").join("*");
-            for entry in glob(glob_pattern.to_string_lossy().as_ref()).with_context(|| {
-                format!(
-                    "Could not find templates from folder {}",
-                    template_folder.display()
-                )
-            })? {
-                match entry {
-                    Ok(path) => {
-                        if path.is_file() {
-                            // Get path without the template folder prefix
-                            let relative = path.relativize(&template_folder);
-                            let template_name = relative.to_string_lossy().replace("\\", "/");
-                            files.push((template_name, path));
-                        }
-                    }
-                    Err(_) => {}
+        if base_folder.is_dir() {
+            let glob_pattern = base_folder.join("**").join(glob);
+            for entry in glob::glob(glob_pattern.to_string_lossy().as_ref())? {
+                let Ok(path) = entry else {
+                    continue;
+                };
+                if path.is_file() {
+                    // Get path without the template folder prefix
+                    let relative = path.relativize(&base_folder);
+                    let template_name = relative.to_string_lossy().replace("\\", "/");
+                    files.push((template_name, path));
                 }
             }
         }

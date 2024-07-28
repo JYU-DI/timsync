@@ -1,3 +1,4 @@
+use anyhow::{Context as AnyhowCtx, Result};
 use handlebars::{
     Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext,
     RenderErrorReason, Renderable,
@@ -6,6 +7,7 @@ use nanoid::nanoid;
 use serde_json::Value;
 
 use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
+use crate::project::project::Project;
 
 /// Area block helper.
 /// Surrounds the content into an area. Areas can be collapsed.
@@ -221,12 +223,44 @@ fn task_helper<'reg, 'rc>(
     Ok(())
 }
 
-pub trait TimRendererExt {
+pub trait TimRendererExt
+where
+    Self: Sized,
+{
     /// Extend the renderer instance with the TIM templates for documents.
     ///
     /// returns: &Self
     fn with_tim_doc_templates(self) -> Self;
+
+    /// Extend the renderer instance with the project templates.
+    /// The templates may be used as partials in the rendering process.
+    ///
+    /// Templates are scanned from the `_templates` folder in a project.
+    /// All files in the folder are registered as templates.
+    ///
+    /// # Arguments
+    ///
+    /// * `project`: The project to get the templates from.
+    ///
+    /// returns: Result<Self, Error>
+    fn with_project_templates(self, project: &Project) -> Result<Self>;
+
+    /// Extend the renderer instance with the project helpers.
+    /// The helpers are used to extend the templating engine with custom scripts.
+    /// 
+    /// Helpers are scanned from the `_helpers` folder in a project.
+    /// The helpers must be written in the Rhai scripting language (file extension `.rhai`).
+    /// 
+    /// # Arguments
+    /// 
+    /// * `project`: The project to get the helpers from.
+    /// 
+    /// returns: Result<Self, Error>
+    fn with_project_helpers(self, project: &Project) -> Result<Self>;
 }
+
+const TEMPLATE_FOLDER: &str = "_templates";
+const HELPERS_FOLDER: &str = "_helpers";
 
 impl TimRendererExt for Handlebars<'_> {
     fn with_tim_doc_templates(mut self) -> Self {
@@ -236,6 +270,29 @@ impl TimRendererExt for Handlebars<'_> {
         self.register_helper("task", Box::new(task_helper));
         handlebars_misc_helpers::register(&mut self);
         self
+    }
+
+    fn with_project_templates(mut self, project: &Project) -> Result<Self> {
+        let template_files = project
+            .find_files(TEMPLATE_FOLDER, "*")
+            .with_context(|| format!("Could not find templates from folder {}", TEMPLATE_FOLDER))?;
+        for (name, template) in template_files {
+            self.register_template_file(&name, template)?;
+        }
+
+        Ok(self)
+    }
+
+    fn with_project_helpers(mut self, project: &Project) -> Result<Self> {
+        let helper_files = project
+            .find_files(HELPERS_FOLDER, "*.rhai")
+            .with_context(|| format!("Could not find helpers from folder {}", HELPERS_FOLDER))?;
+        for (name, helper) in helper_files {
+            let name = name.trim_end_matches(".rhai");
+            self.register_script_helper_file(&name, helper)?;
+        }
+
+        Ok(self)
     }
 }
 
