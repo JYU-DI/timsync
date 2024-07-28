@@ -16,6 +16,7 @@ use walkdir::WalkDir;
 
 use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::processors::{FileProcessor, FileProcessorAPI, FileProcessorType};
+use crate::processing::style_theme_processor::StyleThemeProcessor;
 use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
@@ -109,6 +110,10 @@ impl<'a> SyncPipeline<'a> {
                 (
                     FileProcessorType::TaskPlugin,
                     TaskProcessor::new(project, global_context.clone())?.into(),
+                ),
+                (
+                    FileProcessorType::StyleTheme,
+                    StyleThemeProcessor::new(project, sync_target, global_context.clone())?.into(),
                 ),
             ]),
             sync_target,

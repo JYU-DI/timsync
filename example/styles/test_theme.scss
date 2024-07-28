@@ -1,0 +1,11 @@
+/*
+# Front matter for themes
+title: 'My Custom Theme'
+*/
+
+// Note: templating is enabled supported, so you can define various variables in _config.yml and use them here.
+// This also means that the double curly braces must be properly escaped if you want to use them in your CSS.
+
+p {
+  color: red;
+}

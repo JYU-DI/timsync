@@ -4,6 +4,7 @@ use serde_json::{Map, Value};
 
 use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
+use crate::processing::style_theme_processor::StyleThemeProcessor;
 use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{GeneralProjectFileMetadata, ProjectFile};
@@ -14,7 +15,10 @@ use crate::project::files::project_files::{GeneralProjectFileMetadata, ProjectFi
 pub enum FileProcessorType {
     /// Markdown file processor.
     Markdown,
+    /// Task plugin processor.
     TaskPlugin,
+    /// Style theme processor.
+    StyleTheme,
 }
 
 /// Enum of the different file processors.
@@ -27,6 +31,8 @@ pub enum FileProcessor<'a> {
     Markdown(MarkdownProcessor<'a>),
     /// Task plugin processor.
     Task(TaskProcessor<'a>),
+    // Style theme processor.
+    StyleTheme(StyleThemeProcessor<'a>),
 }
 
 /// Public API for the file processors.

@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::processing::processors::FileProcessorType;
+use crate::project::files::css_file::CSSFile;
 use crate::project::files::markdown_file::MarkdownFile;
 use crate::project::files::yaml_file::YAMLFile;
 use crate::util::path::FullExtension;
@@ -19,6 +20,8 @@ pub enum ProjectFile {
     Markdown(MarkdownFile),
     /// YAML file.
     YAML(YAMLFile),
+    /// CSS file.
+    CSS(CSSFile),
 }
 
 impl TryFrom<PathBuf> for ProjectFile {
@@ -32,10 +35,11 @@ impl TryFrom<PathBuf> for ProjectFile {
             .ok_or(anyhow::anyhow!("Could not convert extension to string"))?;
 
         match ext {
-            "md" => Ok(MarkdownFile::new(path).into()),
+            "md" | "markdown" => Ok(MarkdownFile::new(path).into()),
+            "scss" | "css" => Ok(CSSFile::new(path).into()),
             "task.yaml" | "task.yml" => {
                 Ok(YAMLFile::new(path, FileProcessorType::TaskPlugin).into())
-            }
+            },
             _ => Err(anyhow::anyhow!("No matching file for extension: {}", ext)),
         }
     }

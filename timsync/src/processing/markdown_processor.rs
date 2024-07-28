@@ -52,10 +52,10 @@ pub struct MarkdownProcessor<'a> {
     files: HashMap<Rc<str>, TIMDocInfo>,
 
     /// Reference to the project that is being processed.
-    project: &'a Project,
+    pub(in crate::processing) project: &'a Project,
 
     /// Sync target to which the documents are being synced.
-    sync_target: String,
+    pub(in crate::processing) sync_target: String,
 
     /// Handlebars renderer to render the Markdown files.
     renderer: Handlebars<'a>,
