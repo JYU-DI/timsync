@@ -4,11 +4,7 @@ use std::path::{Path, PathBuf};
 
 use path_absolutize::Absolutize;
 
-pub trait Relativize {
-    fn relativize(&self, path: &Path) -> PathBuf;
-}
-
-impl Relativize for Path {
+pub trait RelativizeExtension {
     /// Resolve the relative path portion of this path in relation to the given path.
     ///
     /// # Arguments
@@ -16,6 +12,10 @@ impl Relativize for Path {
     /// * `path`: The path to relativize against.
     ///
     /// returns: PathBuf
+    fn relativize(&self, path: &Path) -> PathBuf;
+}
+
+impl RelativizeExtension for Path {
     fn relativize(&self, path: &Path) -> PathBuf {
         let self_absolute: Cow<Path> = if self.is_absolute() {
             self.into()
@@ -35,10 +35,6 @@ impl Relativize for Path {
 }
 
 pub trait WithSetExtension {
-    fn with_set_extension<S: AsRef<OsStr>>(self, ext: S) -> PathBuf;
-}
-
-impl WithSetExtension for PathBuf {
     /// Set an extension of the path and return the path itself.
     ///
     /// # Arguments
@@ -46,6 +42,10 @@ impl WithSetExtension for PathBuf {
     /// * `ext`: The extension to set to the path.
     ///
     /// returns: PathBuf
+    fn with_set_extension<S: AsRef<OsStr>>(self, ext: S) -> PathBuf;
+}
+
+impl WithSetExtension for PathBuf {
     fn with_set_extension<S: AsRef<OsStr>>(mut self, ext: S) -> PathBuf {
         self.set_extension(ext);
         self
@@ -53,6 +53,9 @@ impl WithSetExtension for PathBuf {
 }
 
 pub trait FullExtension {
+    /// Get the full extension of the path. That is, all parts after the first dot.
+    ///
+    /// returns: String
     fn full_extension(&self) -> Option<&OsStr>;
 }
 
@@ -82,10 +85,10 @@ fn split_file_at_dot(file: &OsStr) -> (&OsStr, Option<&OsStr>) {
 }
 
 impl FullExtension for PathBuf {
-    /// Get the full extension of the path. That is, all parts after the first dot.
-    ///
-    /// returns: String
+    
     fn full_extension(&self) -> Option<&OsStr> {
-        self.file_name().map(split_file_at_dot).and_then(|(_, after)| after)
+        self.file_name()
+            .map(split_file_at_dot)
+            .and_then(|(_, after)| after)
     }
 }

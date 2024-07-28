@@ -8,9 +8,11 @@ use serde_json::Value;
 use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
 
 /// Area block helper.
+/// Surrounds the content into an area. Areas can be collapsed.
+/// All areas must be named. If no name is specified, the helper generates a random UUID for the name.
 ///
 /// Example:
-/// ```
+/// ```md
 /// {{#area}}
 /// Areas can also be unnamed. In that case, the area name is generated using a random UUID.
 /// {{/area}}
@@ -73,10 +75,11 @@ fn area_block<'reg, 'rc>(
 }
 
 /// Reference area helper.
+/// Inserts a reference to a named area in the same or another document.
 ///
 /// Example:
 ///
-/// ```
+/// ```md
 /// {{#area "area-example"}}
 /// This is the content area.
 /// {{/area}}
@@ -129,6 +132,32 @@ fn ref_area_helper<'reg, 'rc>(
     Ok(())
 }
 
+/// Task helper.
+/// Inserts a reference to a specific task plugin based on the task UID.
+///
+/// **Note**: The helper requires that there is at least one task (`*.task.yml` file) in the project.
+///
+/// Example:
+///
+/// `task-example.task.yml`:
+///
+/// ```yaml
+/// ---
+/// uid: task1
+/// plugin: csPlugin
+/// ---
+/// type: text
+/// header: Task Test
+/// rows: 10
+/// ```
+///
+/// `task-example.md`:
+///
+/// ```md
+/// Task 1:
+///
+/// {{task "task1"}}
+/// ```
 fn task_helper<'reg, 'rc>(
     h: &Helper<'rc>,
     _: &'reg Handlebars<'reg>,
@@ -211,6 +240,13 @@ impl TimRendererExt for Handlebars<'_> {
 }
 
 pub trait Merge {
+    /// Merge a JSON value into the current value.
+    ///
+    /// # Arguments
+    ///
+    /// * `other`: The JSON value to merge
+    ///
+    /// returns: ()
     fn merge(&mut self, other: &Value);
 }
 
@@ -232,11 +268,19 @@ impl Merge for Value {
     }
 }
 
-pub trait ExtendableContext {
+pub trait ContextExtension {
+    /// Extend the context with a JSON value.
+    /// Updates the context data with the JSON value, possibly overwriting existing values.
+    ///
+    /// # Arguments
+    ///
+    /// * `other`: The JSON value to extend the context with
+    ///
+    /// returns: ()
     fn extend_with_json(&mut self, other: &Value);
 }
 
-impl ExtendableContext for handlebars::Context {
+impl ContextExtension for Context {
     fn extend_with_json(&mut self, other: &Value) {
         self.data_mut().merge(other);
     }

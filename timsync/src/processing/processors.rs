@@ -8,9 +8,9 @@ use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{GeneralProjectFileMetadata, ProjectFile};
 
-#[derive(Hash, Eq, PartialEq, Copy, Clone)]
 /// Enum representing the different types of file processors.
 /// Used to determine which processor to use for a given file.
+#[derive(Hash, Eq, PartialEq, Copy, Clone)]
 pub enum FileProcessorType {
     /// Markdown file processor.
     Markdown,
@@ -41,7 +41,7 @@ pub trait FileProcessorAPI {
     fn add_file(&mut self, file: ProjectFile) -> Result<()>;
 
     /// Get additional context that should be included into project context.
-    /// The added context is can be used in templating in other processors.
+    /// The added context is can be used in templating under the `site` variable.
     ///
     /// returns: Option<Map<String, Value>>
     fn get_processor_context(&self) -> Option<Map<String, Value>>;
@@ -67,6 +67,12 @@ pub(in crate::processing) trait FileProcessorInternalAPI {
     /// returns: Result<PreparedDocumentMarkdown>
     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown>;
 
+    /// Get the general metadata for the TIM document.
+    ///
+    /// # Arguments
+    /// * `tim_document` - The TIM document to get the metadata for.
+    /// 
+    /// returns: Result<GeneralProjectFileMetadata>
     fn get_project_file_metadata(
         &self,
         tim_document: &TIMDocument,

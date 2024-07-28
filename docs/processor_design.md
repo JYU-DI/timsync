@@ -75,13 +75,13 @@ All available file processors are defined in the `FileProcessor` enum:
 <https://github.com/JYU-DI/timsync/blob/ce4f0e1086cf5cdd61025ecbef537edf80285181/timsync/src/processing/processors.rs#L21-L25>
 
 As shown, each file processor must implement two traits: a public `FileProcessorAPI` trait and a
-private `FileProcessorRenderAPI`:
+private `FileProcessorInternalAPI`:
 
 <https://github.com/JYU-DI/timsync/blob/ce4f0e1086cf5cdd61025ecbef537edf80285181/timsync/src/processing/processors.rs#L29-L45>
 
 <https://github.com/JYU-DI/timsync/blob/ce4f0e1086cf5cdd61025ecbef537edf80285181/timsync/src/processing/processors.rs#L49-L57>
 
-The traits are separated, as the rendering API is called internally.
+The traits are separated, as the internal API is meant to be used only by TIMDocument.
 
 ## Pipeline
 

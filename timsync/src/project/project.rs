@@ -6,7 +6,7 @@ use simplelog::warn;
 
 use crate::project::config::{CONFIG_FILE_NAME, CONFIG_FOLDER, SyncConfig};
 use crate::project::global_ctx::{GLOBAL_DATA_CONFIG_FILE, GlobalContext};
-use crate::util::path::Relativize;
+use crate::util::path::RelativizeExtension;
 
 /// A TIMSync project
 ///
@@ -27,10 +27,10 @@ impl Project {
     pub fn get_root_path(&self) -> &Path {
         &self.root_path
     }
-    
+
     /// Get the global context prefilled with data defined in the global data config file (`_config.yml`).
     ///
-    /// returns: Result<GlobalContext, Error> 
+    /// returns: Result<GlobalContext, Error>
     pub fn global_context(&self) -> Result<GlobalContext> {
         let global_data_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
         GlobalContext::for_project(&global_data_path)

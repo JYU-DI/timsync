@@ -16,7 +16,7 @@ use crate::project::files::project_files::{
 };
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
-use crate::util::templating::ExtendableContext;
+use crate::util::templating::ContextExtension;
 use crate::util::tim_client::random_par_id;
 
 struct TaskInfo {
@@ -25,24 +25,59 @@ struct TaskInfo {
     task_settings: TaskSettings,
 }
 
+/// Processor for TIM plugin tasks.
+/// The processor generates a single TIM document with all tasks in the project.
+/// The added project files are passed through the templating engine and the results
+/// are added as documents paragraphs to the TIM document.
+///
+/// All files added to this processor must have a front matter that defines values present in
+/// `TaskSettings`.
+///
+/// The processor registers a global context variable `_timsync_tasks_ref_map` that maps task UIDs
+/// to their corresponding paragraph IDs. This may be used in other processors to find the (doc_id, par_id)
+/// tuple for a task.
 pub struct TaskProcessor<'a> {
     files: HashMap<String, TaskInfo>,
     renderer: Handlebars<'a>,
     global_context: Rc<OnceCell<GlobalContext>>,
 }
 
+/// Path to the generated tasks document.
 pub const TASKS_DOCPATH: &str = "_project_tasks";
-pub const TASKS_UID: &str = "_timsync_tasks_doc";
-pub const TASKS_REF_MAP_KEY: &str = "_timsync_tasks_ref_map";
+/// Title of the generated tasks document.
 pub const TASKS_TITLE: &str = "Project tasks";
+/// UID of the generated tasks document.
+/// Used by the templating engine to implement the `task` helper.
+pub const TASKS_UID: &str = "_timsync_tasks_doc";
+/// Key for the tasks reference map in the global context.
+/// Used by the templating engine to implement the `task` helper.
+pub const TASKS_REF_MAP_KEY: &str = "_timsync_tasks_ref_map";
 
+/// Settings for a task. Must be defined in front matter of each project file
+/// that will be processed as a task.
 #[derive(Deserialize)]
 struct TaskSettings {
+    /// Plugin type to use for the task. Mandatory to specify.
+    /// The value will be set as the `plugin` attribute in the plugin paragraph.
     plugin: String,
+    /// Additional attributes to be added to the plugin paragraph. Optional.
+    /// Any key-value pair will be added to the paragraph as such:
+    /// ````
+    /// ``` {key1="value1" key2="value2" ...}
+    /// ```
+    /// ````
     plugin_attributes: Option<Map<String, Value>>,
 }
 
 impl<'a> TaskProcessor<'a> {
+    /// Create a new task processor.
+    ///
+    /// # Arguments
+    ///
+    /// * `project` - The project to process.
+    /// * `global_context` - The global context to use for the processor.
+    ///
+    /// returns: Result<TaskProcessor>
     pub fn new(project: &'a Project, global_context: Rc<OnceCell<GlobalContext>>) -> Result<Self> {
         let mut renderer = Handlebars::new();
         for (name, template) in project.get_template_files()? {

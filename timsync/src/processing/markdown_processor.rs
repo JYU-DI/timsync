@@ -19,8 +19,8 @@ use crate::project::files::project_files::{
 };
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
-use crate::util::path::{Relativize, WithSetExtension};
-use crate::util::templating::{ExtendableContext, TimRendererExt};
+use crate::util::path::{RelativizeExtension, WithSetExtension};
+use crate::util::templating::{ContextExtension, TimRendererExt};
 
 /// Helper struct to store metadata about a document and a reference to the
 /// file in the project folder.
@@ -30,9 +30,9 @@ struct TIMDocInfo {
     proj_file: ProjectFile,
 }
 
-#[derive(Debug, Deserialize)]
 /// Settings for a document
 /// The settings are stored in the front matter of the document
+#[derive(Debug, Deserialize)]
 pub struct DocumentSettings {
     /// The human-readable title of the document
     /// The title is displayed in the navigation bar of TIM
@@ -44,6 +44,8 @@ pub struct DocumentSettings {
 }
 
 /// Processor for markdown files.
+/// The processor generates a TIM document for each project file added to the processor.
+/// The contents of the file are passed to the templating engine and the result is stored in the TIM document.
 pub struct MarkdownProcessor<'a> {
     /// Map of all files to process with their metadata.
     /// Keyed using the final path of the document in TIM.
@@ -58,6 +60,7 @@ pub struct MarkdownProcessor<'a> {
     /// Handlebars renderer to render the Markdown files.
     renderer: Handlebars<'a>,
 
+    /// Reference to the shared global context of the project.
     global_context: Rc<OnceCell<GlobalContext>>,
 }
 

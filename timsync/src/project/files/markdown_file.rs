@@ -9,6 +9,8 @@ use crate::processing::processors::FileProcessorType;
 use crate::project::files::project_files::ProjectFileAPI;
 use crate::project::files::util::{get_or_read_file_contents, get_or_set_front_matter_position};
 
+/// A basic markdown file.
+/// This represents a project file that contains markdown content.
 pub struct MarkdownFile {
     path: PathBuf,
     contents: Lazy<Result<String>>,
@@ -34,6 +36,13 @@ impl ProjectFileAPI for MarkdownFile {
 }
 
 impl MarkdownFile {
+    /// Create a new markdown file.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `path` - The path to the markdown file.
+    /// 
+    /// Returns: MarkdownFile
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
@@ -68,6 +77,9 @@ impl MarkdownFile {
         Ok(root)
     }
 
+    /// Get the parsed markdown abstract syntax tree (AST) of the markdown file.
+    /// 
+    /// Returns: Result<Root>
     pub fn md_ast(&self) -> Result<Root> {
         let api: &dyn ProjectFileAPI = self;
         let contents = api.contents_without_front_matter()?;

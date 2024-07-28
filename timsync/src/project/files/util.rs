@@ -3,6 +3,14 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use lazy_init::Lazy;
 
+/// Utility helper to get or read the contents of a file and store it in a lazy value.
+/// 
+/// # Arguments
+/// 
+/// * `path` - The path to the file to read.
+/// * `lazy` - The lazy value to store the contents in.
+/// 
+/// Returns: Result<&str>
 pub fn get_or_read_file_contents<'a>(
     path: &'a PathBuf,
     lazy: &'a Lazy<Result<String>>,
@@ -18,6 +26,14 @@ pub fn get_or_read_file_contents<'a>(
     }
 }
 
+/// Utility helper to get or set the front matter position of a file and store it in a lazy value.
+/// 
+/// # Arguments
+/// 
+/// * `contents` - The contents of the file to search in.
+/// * `lazy` - The lazy value to store the front matter position in.
+/// 
+/// Returns: Option<(usize, usize)>
 pub fn get_or_set_front_matter_position<'a>(
     contents: &'a Lazy<Result<String>>,
     lazy: &'a Lazy<Option<(usize, usize)>>,
@@ -39,9 +55,9 @@ pub fn get_or_set_front_matter_position<'a>(
 /// This is a basic naive implementation that looks for any string of format
 ///
 /// ```
-/// <start_delimiter>
+/// start_delimiter
 /// .*
-/// <end_delimiter>
+/// end_delimiter
 /// ```
 ///
 /// # Arguments

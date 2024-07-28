@@ -17,6 +17,7 @@ use crate::util::path::FullExtension;
 pub enum ProjectFile {
     /// Markdown file.
     Markdown(MarkdownFile),
+    /// YAML file.
     YAML(YAMLFile),
 }
 
