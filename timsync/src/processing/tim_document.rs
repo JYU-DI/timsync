@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use serde_json::Value;
 
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::processors::FileProcessorInternalAPI;
@@ -27,6 +28,12 @@ impl TIMDocument<'_> {
 
     /// Get the general metadata associated with the TIM document.
     pub fn general_metadata(&self) -> Result<GeneralProjectFileMetadata> {
-        self.renderer.get_project_file_metadata(&self)
+        let json = self.renderer.get_project_file_front_matter_json(&self)?;
+        serde_json::from_value(json).context("Failed to deserialize general metadata")
+    }
+
+    /// Get the front matter associated with the TIM document.
+    pub fn front_matter_json(&self) -> Result<Value> {
+        self.renderer.get_project_file_front_matter_json(&self)
     }
 }

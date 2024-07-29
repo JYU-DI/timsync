@@ -22,6 +22,7 @@ use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
+use crate::util::templating::Merge;
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
 
 #[derive(Debug, Args)]
@@ -341,19 +342,20 @@ impl<'a> SyncPipeline<'a> {
         let mut all_documents_infos = Vec::new();
 
         for doc in documents {
-            let meta = doc.general_metadata()?;
+            let general_meta = doc.general_metadata()?;
 
-            let doc_info = json!({
+            let mut doc_meta_json = doc.front_matter_json()?;
+            doc_meta_json.merge(&json!({
                "doc_id": doc.id,
                 "path": doc.path,
                 "title": doc.title
-            });
+            }));
 
-            if let Some(doc_uid) = meta.uid {
-                uid_to_info_map.insert(doc_uid, doc_info.clone());
+            if let Some(doc_uid) = general_meta.uid {
+                uid_to_info_map.insert(doc_uid, doc_meta_json.clone());
             }
 
-            all_documents_infos.push(doc_info.clone());
+            all_documents_infos.push(doc_meta_json.clone());
         }
 
         let mut global_context = self.project.global_context()?;

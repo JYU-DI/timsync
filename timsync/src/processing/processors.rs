@@ -7,7 +7,7 @@ use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::style_theme_processor::StyleThemeProcessor;
 use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
-use crate::project::files::project_files::{GeneralProjectFileMetadata, ProjectFile};
+use crate::project::files::project_files::ProjectFile;
 
 /// Enum representing the different types of file processors.
 /// Used to determine which processor to use for a given file.
@@ -73,14 +73,11 @@ pub(in crate::processing) trait FileProcessorInternalAPI {
     /// returns: Result<PreparedDocumentMarkdown>
     fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown>;
 
-    /// Get the general metadata for the TIM document.
+    /// Get the metadata for the TIM document (i.e., the front matter) as a JSON object.
     ///
     /// # Arguments
     /// * `tim_document` - The TIM document to get the metadata for.
     ///
-    /// returns: Result<GeneralProjectFileMetadata>
-    fn get_project_file_metadata(
-        &self,
-        tim_document: &TIMDocument,
-    ) -> Result<GeneralProjectFileMetadata>;
+    /// returns: Result<Value>
+    fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value>;
 }

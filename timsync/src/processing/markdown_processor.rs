@@ -14,9 +14,7 @@ use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::markdown_file::MarkdownFile;
-use crate::project::files::project_files::{
-    GeneralProjectFileMetadata, ProjectFile, ProjectFileAPI,
-};
+use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 use crate::util::path::{RelativizeExtension, WithSetExtension};
@@ -322,13 +320,10 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
         Ok(res.into())
     }
 
-    fn get_project_file_metadata(
-        &self,
-        tim_document: &TIMDocument,
-    ) -> Result<GeneralProjectFileMetadata> {
+    fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value> {
         // This unwrap is safe because the file was added to the processor
         // Because internal API is only called by TIMDocument, the file should always exist
         let info = self.files.get(tim_document.path).unwrap();
-        info.proj_file.read_general_metadata()
+        info.proj_file.front_matter_json()
     }
 }

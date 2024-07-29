@@ -3,10 +3,10 @@ title: Hello!
 wew: true
 ---
 
-``` {settings=""}
+{{#docsettings}}
 macros:
   wew: {{ json_to_str site.test2 }} 
-```
+{{/docsettings}}
 
 # Hello, world!
 
@@ -16,6 +16,8 @@ This is a test from TIMSync!
 
 This is docid of another document: {{ site.doc.hello2.doc_id }}  
 This is path of another document: {{ site.doc.hello2.path }}
+
+This is a variable captured from another document: {{ site.doc.hello2.foo }}
 
 Base path: {{ site.base_path }}
 

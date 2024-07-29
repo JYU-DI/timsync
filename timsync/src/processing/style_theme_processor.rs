@@ -10,9 +10,7 @@ use crate::processing::markdown_processor::MarkdownProcessor;
 use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
 use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
-use crate::project::files::project_files::{
-    GeneralProjectFileMetadata, ProjectFile, ProjectFileAPI,
-};
+use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 
@@ -127,11 +125,8 @@ impl<'a> FileProcessorInternalAPI for StyleThemeProcessor<'a> {
         Ok(res.into())
     }
 
-    fn get_project_file_metadata(
-        &self,
-        tim_document: &TIMDocument,
-    ) -> Result<GeneralProjectFileMetadata> {
+    fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value> {
         self.markdown_processor
-            .get_project_file_metadata(tim_document)
+            .get_project_file_front_matter_json(tim_document)
     }
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use enum_dispatch::enum_dispatch;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::css_file::CSSFile;
@@ -129,7 +129,7 @@ impl ProjectFile {
             )
         })?;
         if front_matter.is_empty() {
-            return Ok(Value::Object(serde_json::Map::new()));
+            return Ok(Value::Object(Map::new()));
         }
         let front_matter = serde_yaml::from_str(&front_matter).with_context(|| {
             format!(
