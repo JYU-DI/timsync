@@ -30,14 +30,15 @@ impl GlobalContext {
         }
     }
 
-    /// Create a new GlobalContextBuilder and pre-load the global data from a YAML file.
+    /// Create a new GlobalContextBuilder and preload the global data from a YAML file.
     ///
     /// # Arguments
     ///
-    /// * `global_config_path`: The path to the global data YAML file
+    /// * `project_path`: The path to the project directory
     ///
     /// returns: Result<Self, Error>
-    pub fn for_project(global_config_path: &PathBuf) -> Result<Self> {
+    pub fn for_project(project_path: &PathBuf) -> Result<Self> {
+        let global_config_path = project_path.join(GLOBAL_DATA_CONFIG_FILE);
         let mut builder = Self::new();
 
         if global_config_path.is_file() {

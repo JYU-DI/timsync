@@ -130,10 +130,11 @@ impl<'a> SyncPipeline<'a> {
         progress.enable_steady_tick(Duration::from_millis(100));
 
         let root = self.project.get_root_path();
+        let ignores = self.project.ignore_file()?;
 
         let project_files = WalkDir::new(root)
             .into_iter()
-            .filter_entry(|e| !is_hidden(e))
+            .filter_entry(|e| !is_hidden(e) && !ignores.is_ignored(e.path()))
             .filter_map(|e| e.ok().map(|e| e.path().to_path_buf()))
             .filter(|e| e.is_file())
             .filter_map(|e| ProjectFile::try_from(e).ok());

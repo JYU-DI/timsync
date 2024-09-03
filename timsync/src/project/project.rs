@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use simplelog::warn;
 
 use crate::project::config::{SyncConfig, CONFIG_FILE_NAME, CONFIG_FOLDER};
-use crate::project::global_ctx::{GlobalContext, GLOBAL_DATA_CONFIG_FILE};
+use crate::project::global_ctx::{GlobalContext};
+use crate::project::ignore_file::IgnoreFile;
 use crate::util::path::RelativizeExtension;
 
 /// A TIMSync project
@@ -29,18 +30,25 @@ impl Project {
     ///
     /// returns: Result<GlobalContext, Error>
     pub fn global_context(&self) -> Result<GlobalContext> {
-        let global_data_path = self.root_path.join(GLOBAL_DATA_CONFIG_FILE);
-        GlobalContext::for_project(&global_data_path)
+        GlobalContext::for_project(&self.root_path)
+    }
+
+    /// Get the ignore file for the project.
+    /// The ignore file contains patterns to exclude files from the project.
+    ///
+    /// returns: Result<IgnoreFile, Error>
+    pub fn ignore_file(&self) -> Result<IgnoreFile> {
+        IgnoreFile::for_project(&self.root_path).context("Could not read the ignore file")
     }
 
     /// Find files in the project directory and its subdirectories.
     /// Returns a list of URL-safe names and the full paths to the files.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `dir`: The directory to search for files in.
     /// * `glob`: The glob pattern to match files against.
-    /// 
+    ///
     /// returns: Result<Vec<(String, PathBuf)>, Error>
     pub fn find_files(&self, dir: impl AsRef<Path>, glob: &str) -> Result<Vec<(String, PathBuf)>> {
         let base_folder = self.root_path.join(dir);

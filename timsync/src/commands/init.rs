@@ -11,6 +11,7 @@ use thiserror::Error;
 use crate::commands::target::prompt_user_details_interactive;
 use crate::project::config::{SyncConfig, SyncTarget, CONFIG_FILE_NAME, CONFIG_FOLDER};
 use crate::project::global_ctx::{DEFAULT_GLOBAL_DATA, GLOBAL_DATA_CONFIG_FILE};
+use crate::project::ignore_file::{DEFAULT_SYNC_IGNORE_FILE, SYNC_IGNORE_FILE_NAME};
 
 #[derive(Debug, Args)]
 pub struct InitOptions {
@@ -131,6 +132,14 @@ pub async fn init_repo(opts: InitOptions) -> Result<()> {
     if !global_config_file.exists() {
         std::fs::write(&global_config_file, &DEFAULT_GLOBAL_DATA)
             .context("Could not create global data config file")?;
+    }
+
+    let ignore_file = target_path.join(&SYNC_IGNORE_FILE_NAME);
+
+    // Create or update the .timsyncignore file
+    if !ignore_file.exists() {
+        std::fs::write(&ignore_file, &DEFAULT_SYNC_IGNORE_FILE)
+            .context("Could not create TIMSync ignore file")?;
     }
 
     Ok(())
