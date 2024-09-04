@@ -56,10 +56,16 @@ fn area_block<'reg, 'rc>(
         .map(|v| v.value().is_truthy(true))
         .unwrap_or(false);
 
+    let class = h
+        .hash_get("class")
+        .and_then(|v| v.value().as_str())
+        .unwrap_or("");
+
     out.write(&format!(
-        "#- {{area=\"{}\" {}}}\n",
+        "#- {{area=\"{}\" {} {}}}\n",
         area_name,
-        if collapse { "collapse=\"true\"" } else { "" }
+        if collapse { "collapse=\"true\"" } else { "" },
+        class
     ))?;
 
     if !collapse {
