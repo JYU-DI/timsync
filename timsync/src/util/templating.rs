@@ -62,6 +62,10 @@ fn area_block<'reg, 'rc>(
         if collapse { "collapse=\"true\"" } else { "" }
     ))?;
 
+    if !collapse {
+        out.write("\n#-\n")?;
+    }
+    
     if let Some(tmpl) = h.template() {
         tmpl.render(r, ctx, rc, out)?;
     }
