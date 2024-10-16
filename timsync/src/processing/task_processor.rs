@@ -204,4 +204,8 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
             "uid": TASKS_UID,
         }))
     }
+
+    fn get_project_file_local_path(&self, _: &TIMDocument) -> Option<String> {
+        None
+    }
 }

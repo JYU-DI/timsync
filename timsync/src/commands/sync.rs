@@ -349,7 +349,8 @@ impl<'a> SyncPipeline<'a> {
             doc_meta_json.merge(&json!({
                "doc_id": doc.id,
                 "path": doc.path,
-                "title": doc.title
+                "title": doc.title,
+                "local_file_path": doc.get_local_file_path(),
             }));
 
             if let Some(doc_uid) = general_meta.uid {

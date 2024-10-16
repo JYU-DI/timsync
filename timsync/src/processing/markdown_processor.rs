@@ -326,4 +326,17 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
         let info = self.files.get(tim_document.path).unwrap();
         info.proj_file.front_matter_json()
     }
+
+    fn get_project_file_local_path(&self, tim_document: &TIMDocument) -> Option<String> {
+        // This unwrap is safe because the file was added to the processor
+        // Because internal API is only called by TIMDocument, the file should always exist
+        let info = self.files.get(tim_document.path).unwrap();
+        Some(
+            info.proj_file
+                .path()
+                .relativize(self.project.get_root_path())
+                .to_string_lossy()
+                .to_string()
+        )
+    }
 }

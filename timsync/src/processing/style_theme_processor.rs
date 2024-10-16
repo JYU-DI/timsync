@@ -129,4 +129,8 @@ impl<'a> FileProcessorInternalAPI for StyleThemeProcessor<'a> {
         self.markdown_processor
             .get_project_file_front_matter_json(tim_document)
     }
+
+    fn get_project_file_local_path(&self, tim_document: &TIMDocument) -> Option<String> {
+        self.markdown_processor.get_project_file_local_path(tim_document)
+    }
 }

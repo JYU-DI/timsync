@@ -80,4 +80,16 @@ pub(in crate::processing) trait FileProcessorInternalAPI {
     ///
     /// returns: Result<Value>
     fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value>;
+
+    /// Get the local path of the TIM document.
+    ///
+    /// If the TIM document is a local file, this method returns the local path of the file
+    /// relative to the project root.
+    /// Otherwise, it returns None.
+    ///
+    /// # Arguments
+    /// * `tim_document` - The TIM document to get the local path for.
+    ///
+    /// returns: Option<String>
+    fn get_project_file_local_path(&self, tim_document: &TIMDocument) -> Option<String>;
 }

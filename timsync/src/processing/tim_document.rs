@@ -36,4 +36,15 @@ impl TIMDocument<'_> {
     pub fn front_matter_json(&self) -> Result<Value> {
         self.renderer.get_project_file_front_matter_json(&self)
     }
+    
+    /// Get the local file path of the TIM document if it is a local file.
+    /// 
+    /// If the TIM document is a local file, this method returns the local path of the file
+    /// relative to the project root.
+    /// Otherwise, it returns None.
+    /// 
+    /// returns: Option<String>
+    pub fn get_local_file_path(&self) -> Option<String> {
+        self.renderer.get_project_file_local_path(&self)
+    }
 }
