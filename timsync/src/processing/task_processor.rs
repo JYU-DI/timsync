@@ -14,6 +14,7 @@ use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
+use crate::util::path::RelativizeExtension;
 use crate::util::templating::{ContextExtension, TimRendererExt};
 use crate::util::tim_client::random_par_id;
 
@@ -35,6 +36,7 @@ struct TaskInfo {
 /// to their corresponding paragraph IDs. This may be used in other processors to find the (doc_id, par_id)
 /// tuple for a task.
 pub struct TaskProcessor<'a> {
+    project: &'a Project,
     files: HashMap<String, TaskInfo>,
     renderer: Handlebars<'a>,
     global_context: Rc<OnceCell<GlobalContext>>,
@@ -82,6 +84,7 @@ impl<'a> TaskProcessor<'a> {
             .with_project_helpers(project)?;
 
         Ok(Self {
+            project,
             files: HashMap::new(),
             renderer,
             global_context,
@@ -148,9 +151,15 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
         // 3. Return the prepared markdown
 
         let mut result_buf: Vec<u8> = Vec::new();
+        let project_root_dir = self.project.get_root_path();
 
         for (uid, task_info) in self.files.iter() {
-            let proj_file_path = task_info.file.path();
+            let proj_file_path = task_info
+                .file
+                .path()
+                .relativize(project_root_dir)
+                .to_string_lossy()
+                .to_string();
             let contents = task_info.file.contents_without_front_matter()?;
 
             let mut ctx = self
@@ -159,6 +168,8 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
                 .expect("Global context not set")
                 .handlebars_context();
             ctx.extend_with_json(&task_info.file.front_matter_json()?);
+            // We manually override the original "local_file_path"
+            // to correctly point to the currently processed file
             ctx.extend_with_json(&json!({
                 "local_file_path": proj_file_path
             }));

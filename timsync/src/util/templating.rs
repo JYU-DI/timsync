@@ -1,13 +1,14 @@
+use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
+use crate::project::project::Project;
+use crate::util::path::{NormalizeExtension, RelativizeExtension};
 use anyhow::{Context as AnyhowCtx, Result};
 use handlebars::{
     Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext,
     RenderErrorReason, Renderable,
 };
 use nanoid::nanoid;
-use serde_json::Value;
-
-use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
-use crate::project::project::Project;
+use serde_json::{json, Map, Value};
+use std::path::Path;
 
 /// Area block helper.
 /// Surrounds the content into an area. Areas can be collapsed.
@@ -71,7 +72,7 @@ fn area_block<'reg, 'rc>(
     if !collapse {
         out.write("\n#-\n")?;
     }
-    
+
     if let Some(tmpl) = h.template() {
         tmpl.render(r, ctx, rc, out)?;
     }
@@ -218,16 +219,7 @@ fn task_helper<'reg, 'rc>(
             )
         })?;
 
-    let site_ctx_json = ctx
-        .data()
-        .as_object()
-        .map(|v| {
-            v.get("site")
-                .expect("Site context is not set")
-                .as_object()
-                .expect("Site context is not an object")
-        })
-        .ok_or_else(|| RenderErrorReason::Other("Site context data is not set".to_string()))?;
+    let site_ctx_json = _get_site_ctx_json(ctx)?;
 
     let task_ref_map = site_ctx_json.get(TASKS_REF_MAP_KEY).ok_or_else(|| {
         RenderErrorReason::Other("There are no tasks registered in the project. Add tasks (`.task.yml` files) to the project to use the task helper.".to_string())
@@ -259,6 +251,134 @@ fn task_helper<'reg, 'rc>(
     ))?;
 
     Ok(())
+}
+
+/// Include helper.
+/// Includes the content of a file in the current document with optional templating.
+/// The file path can be either relative or absolute to the project root (by using `/` as a prefix).
+///
+/// **Note**: To use relative paths, the local file path variable must be set in the context.
+///
+/// Example:
+///
+/// ```md
+/// Relative include to the current file {{include "path/to/file.md"}}
+///
+/// Absolute include {{include "/path/to/file.md"}}
+///
+/// Include without templating {{include "path/to/file.md" template=false}}
+/// ```
+fn include_helper<'reg, 'rc>(
+    h: &Helper<'rc>,
+    r: &'reg Handlebars<'reg>,
+    ctx: &'rc Context,
+    _: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let file_path = h
+        .param(0)
+        .ok_or_else(|| RenderErrorReason::ParamNotFoundForIndex("path", 0))?
+        .value()
+        .as_str()
+        .ok_or_else(|| {
+            RenderErrorReason::ParamTypeMismatchForName(
+                "path",
+                "0".to_string(),
+                "string".to_string(),
+            )
+        })?;
+
+    let do_template = h
+        .hash_get("template")
+        .map(|v| v.value().is_truthy(true))
+        .unwrap_or(true);
+
+    let site_ctx_json = _get_site_ctx_json(ctx)?;
+    let local_project_dir = site_ctx_json
+        .get("local_project_dir")
+        .expect("Local project directory is not set")
+        .as_str()
+        .expect("Local project directory is not a string");
+
+    let target_file_path = if file_path.starts_with("/") {
+        // Absolute path, resolve from project root
+        Path::new(local_project_dir).join(&file_path[1..])
+    } else {
+        // Relative path, resolve from current file
+        let local_file_path = ctx
+            .data()
+            .get("local_file_path")
+            .ok_or_else(|| RenderErrorReason::Other("Local file path is not set".to_string()))?
+            .as_str()
+            .ok_or_else(|| {
+                RenderErrorReason::Other("Local file path is not a string".to_string())
+            })?;
+
+        Path::new(local_project_dir)
+            .join(local_file_path)
+            .parent()
+            .ok_or_else(|| {
+                RenderErrorReason::Other(
+                    "Could not get parent directory of the local file path to resolve relative path".to_string(),
+                )
+            })?
+            .join(&file_path)
+            .to_path_buf()
+    };
+    // Normalize by removing redundant components and up-level references
+    let target_file_path = target_file_path.normalize();
+
+    if !target_file_path.is_file() {
+        return Err(RenderErrorReason::Other(format!(
+            "File '{}' does not exist",
+            target_file_path.display()
+        ))
+        .into());
+    }
+
+    let file_contents = std::fs::read_to_string(&target_file_path).map_err(|e| {
+        RenderErrorReason::Other(format!(
+            "Could not read file '{}': {}",
+            target_file_path.display(),
+            e
+        ))
+    })?;
+
+    let file_contents = if do_template {
+        let new_local_file_path = target_file_path
+            .relativize(Path::new(local_project_dir))
+            .to_string_lossy()
+            .to_string();
+        // Create a new context with the local file path set to the included file
+        // This allows the included file to use include helper itself
+        let mut ctx = ctx.clone();
+        ctx.extend_with_json(&json!({
+            "local_file_path": new_local_file_path
+        }));
+
+        r.render_template_with_context(&file_contents, &ctx)
+            .map_err(|e| {
+                RenderErrorReason::Other(format!(
+                    "Could not render included file '{}': {}",
+                    target_file_path.display(),
+                    e
+                ))
+            })?
+    } else {
+        file_contents
+    };
+
+    out.write(&file_contents)?;
+
+    Ok(())
+}
+
+fn _get_site_ctx_json(ctx: &Context) -> Result<&Map<String, Value>, RenderErrorReason> {
+    ctx.data()
+        .get("site")
+        .ok_or_else(|| RenderErrorReason::Other("Site context data is not set".to_string()))?
+        .as_object()
+        .ok_or_else(|| RenderErrorReason::Other("Site context data is not an object".to_string()))
 }
 
 pub trait TimRendererExt
@@ -307,6 +427,7 @@ impl TimRendererExt for Handlebars<'_> {
         self.register_helper("docsettings", Box::new(docsettings_block));
         self.register_helper("ref_area", Box::new(ref_area_helper));
         self.register_helper("task", Box::new(task_helper));
+        self.register_helper("include", Box::new(include_helper));
         handlebars_misc_helpers::register(&mut self);
         self
     }

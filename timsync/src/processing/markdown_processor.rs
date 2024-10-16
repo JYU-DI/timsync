@@ -304,7 +304,7 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
             "title": tim_document.title,
             "path": tim_document.path,
             "doc_id": tim_document.id.unwrap_or(0),
-            "local_file_path": proj_file_path.to_string_lossy(),
+            "local_file_path": tim_document.get_local_file_path(),
         }));
 
         let res = self

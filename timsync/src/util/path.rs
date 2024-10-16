@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use path_absolutize::Absolutize;
 
@@ -89,5 +89,43 @@ impl FullExtension for PathBuf {
         self.file_name()
             .map(split_file_at_dot)
             .and_then(|(_, after)| after)
+    }
+}
+
+pub trait NormalizeExtension {
+    /// Normalize the path by removing any `.` and `..` components.
+    ///
+    /// returns: PathBuf
+    fn normalize(&self) -> PathBuf;
+}
+
+impl NormalizeExtension for PathBuf {
+    fn normalize(&self) -> PathBuf {
+        let mut components = self.components().peekable();
+        let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek() {
+            let buf = PathBuf::from(c.as_os_str());
+            components.next();
+            buf
+        } else {
+            PathBuf::new()
+        };
+
+        for component in components {
+            match component {
+                Component::Prefix(..) => unreachable!(),
+                Component::RootDir => {
+                    ret.push(component.as_os_str());
+                }
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    ret.pop();
+                }
+                Component::Normal(c) => {
+                    ret.push(c);
+                }
+            }
+        }
+
+        ret
     }
 }
