@@ -2,7 +2,11 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
+use anyhow::Context;
 use path_absolutize::Absolutize;
+use sha1::Digest;
+use std::fs::File;
+use std::io;
 
 pub trait RelativizeExtension {
     /// Resolve the relative path portion of this path in relation to the given path.
@@ -128,4 +132,36 @@ impl NormalizeExtension for PathBuf {
 
         ret
     }
+}
+
+/// Generate a hashed filename based on the file extension and the contents of the file.
+/// The hash is calculated using the SHA1 algorithm.
+///
+/// # Arguments
+///
+/// * `target_file_path`: The path to the file to generate the hashed filename for.
+///
+/// returns: Result<String>
+pub fn generate_hashed_filename(target_file_path: &PathBuf) -> anyhow::Result<String> {
+    if !target_file_path.is_file() {
+        return Err(anyhow::anyhow!(
+            "File does not exist: {}",
+            target_file_path.display()
+        ));
+    }
+
+    let file_ext = target_file_path
+        .full_extension()
+        .and_then(|ext| ext.to_str().map(|s| format!(".{}", s)))
+        .unwrap_or("".to_string());
+
+    let file_sha1 = {
+        let mut file = File::open(&target_file_path)
+            .with_context(|| format!("Could not open file '{}'", target_file_path.display()))?;
+        let mut hasher = sha1::Sha1::new();
+        io::copy(&mut file, &mut hasher)?;
+        format!("{:x}", hasher.finalize())
+    };
+
+    Ok(format!("{}{}", file_sha1, file_ext))
 }

@@ -8,14 +8,16 @@ use handlebars::Handlebars;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
+use crate::processing::prepared_document::PreparedDocument;
 use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 use crate::util::path::RelativizeExtension;
-use crate::util::templating::{ContextExtension, TimRendererExt};
+use crate::util::templating::{
+    ContextExtension, RendererExtension, TimRendererExt, FILE_MAP_ATTRIBUTE,
+};
 use crate::util::tim_client::random_par_id;
 
 struct TaskInfo {
@@ -80,6 +82,7 @@ impl<'a> TaskProcessor<'a> {
     /// returns: Result<TaskProcessor>
     pub fn new(project: &'a Project, global_context: Rc<OnceCell<GlobalContext>>) -> Result<Self> {
         let renderer = Handlebars::new()
+            .with_file_helpers()
             .with_project_templates(project)?
             .with_project_helpers(project)?;
 
@@ -143,7 +146,7 @@ impl<'a> FileProcessorAPI for TaskProcessor<'a> {
 }
 
 impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
-    fn render_tim_document(&self, _: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
+    fn render_tim_document(&self, _: &TIMDocument) -> Result<PreparedDocument> {
         // This processor produces only one document.
         // Idea:
         // 1. Iterate over all project files and pass them through the Handlebars renderer
@@ -152,6 +155,8 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
 
         let mut result_buf: Vec<u8> = Vec::new();
         let project_root_dir = self.project.get_root_path();
+
+        let mut upload_files_map = HashMap::new();
 
         for (uid, task_info) in self.files.iter() {
             let proj_file_path = task_info
@@ -170,7 +175,10 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
             ctx.extend_with_json(&task_info.file.front_matter_json()?);
             // We manually override the original "local_file_path"
             // to correctly point to the currently processed file
+            // We also insert the path to point to the tasks document
+            // so that the "file" helper can be used in the task files
             ctx.extend_with_json(&json!({
+                "path": TASKS_DOCPATH,
                 "local_file_path": proj_file_path
             }));
 
@@ -196,9 +204,24 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
             }
             write!(result_buf, "}}\n\n").context("Could not write plugin paragraph")?;
 
-            self.renderer
-                .render_template_with_context_to_write(&contents, &ctx, &mut result_buf)
+            let res = self
+                .renderer
+                .render_template_with_context_to_write_return_new_context(
+                    &contents,
+                    &ctx,
+                    &mut result_buf,
+                )
                 .context("Could not render plugin YAML")?;
+
+            let task_upload_files_map = res
+                .modified_context
+                .and_then(|c| {
+                    c.data().get(FILE_MAP_ATTRIBUTE).and_then(|v| {
+                        serde_json::from_value::<HashMap<String, String>>(v.clone()).ok()
+                    })
+                })
+                .unwrap_or_default();
+            upload_files_map.extend(task_upload_files_map);
 
             write!(result_buf, "\n\n```\n\n").context("Could not write plugin paragraph")?;
         }
@@ -206,7 +229,10 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
         let result_str =
             String::from_utf8(result_buf).expect("Could not convert result buffer to string");
 
-        Ok(result_str.into())
+        Ok(PreparedDocument {
+            markdown: result_str,
+            upload_files: upload_files_map,
+        })
     }
 
     fn get_project_file_front_matter_json(&self, _: &TIMDocument) -> Result<Value> {

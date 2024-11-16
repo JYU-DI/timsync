@@ -3,7 +3,7 @@ use enum_dispatch::enum_dispatch;
 use serde_json::{Map, Value};
 
 use crate::processing::markdown_processor::MarkdownProcessor;
-use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
+use crate::processing::prepared_document::PreparedDocument;
 use crate::processing::style_theme_processor::StyleThemeProcessor;
 use crate::processing::task_processor::TaskProcessor;
 use crate::processing::tim_document::TIMDocument;
@@ -71,7 +71,7 @@ pub(in crate::processing) trait FileProcessorInternalAPI {
     /// * `tim_document` - The TIM document to render. The reference is guaranteed to be from the same processor.
     ///
     /// returns: Result<PreparedDocumentMarkdown>
-    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown>;
+    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocument>;
 
     /// Get the metadata for the TIM document (i.e., the front matter) as a JSON object.
     ///

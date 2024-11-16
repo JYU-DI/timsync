@@ -1,9 +1,13 @@
 use anyhow::{Context, Result};
 use rand::Rng;
-use reqwest::{Client, ClientBuilder, RequestBuilder};
+use reqwest::multipart::{Form, Part};
+use reqwest::{Body, Client, ClientBuilder, RequestBuilder};
 use serde::Deserialize;
 use serde_json::json;
+use std::path::Path;
 use thiserror::Error;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 /// TIM API client
 pub struct TimClient {
@@ -28,6 +32,8 @@ pub enum TimClientErrors {
     InvalidItemType(String, String, String),
     #[error("Failed to process {0}: {1}")]
     ItemError(String, String),
+    #[error("File not found: {0}")]
+    FileNotFound(String),
 }
 
 /// Information about a TIM item (e.g., document or folder)
@@ -53,6 +59,16 @@ pub struct ItemInfo {
 
     /// Language ID of the item if it is a document and has a language set
     pub lang_id: Option<String>,
+}
+
+/// Information about a file uploaded to TIM
+#[derive(Deserialize)]
+#[allow(dead_code)]
+pub struct UploadFileInfo {
+    /// File's block ID
+    pub id: u64,
+    /// File name
+    pub filename: String,
 }
 
 #[derive(Deserialize, PartialEq)]
@@ -409,6 +425,102 @@ impl TimClient {
             .send()
             .await
             .with_context(|| format!("Could not upload markdown to {}", item_path))?;
+
+        if result.status().is_success() {
+            Ok(())
+        } else {
+            Err(
+                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
+                    .into(),
+            )
+        }
+    }
+
+    /// Get a list of uploaded files in a document in TIM.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_path`: Path to the document in TIM, e.g. `kurssit/tie/kurssi`.
+    ///
+    /// returns: Result<Vec<UploadFileInfo>, Error>
+    pub async fn get_document_uploads(&self, item_path: &str) -> Result<Vec<UploadFileInfo>> {
+        let item = self.get_item_info(item_path).await?;
+
+        match item.item_type {
+            ItemType::Document => (),
+            _ => {
+                return Err(TimClientErrors::InvalidItemType(
+                    item_path.to_string(),
+                    ItemType::Document.to_string(),
+                    item.item_type.to_string(),
+                )
+                .into());
+            }
+        }
+
+        let result = self
+            .get(&format!("docUploads/{}", item_path))
+            .send()
+            .await
+            .with_context(|| format!("Could not get uploads for {}", item_path))?;
+
+        if result.status().is_success() {
+            let uploads = result
+                .json::<Vec<UploadFileInfo>>()
+                .await
+                .context("Could not parse upload info JSON")?;
+            Ok(uploads)
+        } else {
+            Err(
+                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
+                    .into(),
+            )
+        }
+    }
+
+    pub async fn upload_file(
+        &self,
+        item_path: &str,
+        file_path: impl AsRef<Path>,
+        file_name: &str,
+    ) -> Result<()> {
+        let file_path = file_path.as_ref();
+        if !file_path.is_file() {
+            return Err(
+                TimClientErrors::FileNotFound(file_path.to_string_lossy().to_string()).into(),
+            );
+        }
+
+        let item = self.get_item_info(item_path).await?;
+
+        match item.item_type {
+            ItemType::Document => (),
+            _ => {
+                return Err(TimClientErrors::InvalidItemType(
+                    item_path.to_string(),
+                    ItemType::Document.to_string(),
+                    item.item_type.to_string(),
+                )
+                .into());
+            }
+        }
+
+        let form = Form::new().text("doc_id", item.id.to_string()).part(
+            "file",
+            Part::stream({
+                let file = File::open(file_path).await?;
+                let stream = FramedRead::new(file, BytesCodec::new());
+                Body::wrap_stream(stream)
+            })
+            .file_name(file_name.to_string()),
+        );
+
+        let result = self
+            .post("upload/")
+            .multipart(form)
+            .send()
+            .await
+            .with_context(|| format!("Could not upload file to {}", item_path))?;
 
         if result.status().is_success() {
             Ok(())

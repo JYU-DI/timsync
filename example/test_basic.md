@@ -33,6 +33,8 @@ This is another test text!
 
 This is a link: [Testi](test_other_file)
 
+Markdown link: [Testi 2](./test_other_file.md); [Testi 3](test_other_file.md)
+
 This is a template value: {{ 2 }}
 
 {{#area "test"}}

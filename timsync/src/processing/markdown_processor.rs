@@ -5,20 +5,22 @@ use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use handlebars::Handlebars;
-use markdown::mdast::Node;
+use markdown::mdast::{Node, Root};
+use markdown::{Constructs, ParseOptions};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use url::{ParseError, Url};
 
-use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
+use crate::processing::prepared_document::PreparedDocument;
 use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
-use crate::project::files::markdown_file::MarkdownFile;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
-use crate::util::path::{RelativizeExtension, WithSetExtension};
-use crate::util::templating::{ContextExtension, TimRendererExt};
+use crate::util::path::{generate_hashed_filename, RelativizeExtension, WithSetExtension};
+use crate::util::templating::{
+    ContextExtension, RendererExtension, TimRendererExt, FILE_MAP_ATTRIBUTE,
+};
 
 /// Helper struct to store metadata about a document and a reference to the
 /// file in the project folder.
@@ -93,6 +95,39 @@ impl<'a> MarkdownProcessor<'a> {
         })
     }
 
+    /// Parse the Markdown document into an AST.
+    ///
+    /// # Arguments
+    ///
+    /// * `contents` - The contents of the Markdown document.
+    ///
+    /// Returns: Root
+    fn get_md_ast(&self, contents: &str) -> Result<Root> {
+        // This cannot fail, see https://docs.rs/markdown/1.0.0-alpha.14/markdown/fn.to_mdast.html
+        let mdast = markdown::to_mdast(
+            &contents,
+            &ParseOptions {
+                constructs: Constructs {
+                    frontmatter: true,
+                    ..Constructs::default()
+                },
+                ..ParseOptions::default()
+            },
+        )
+        .unwrap();
+
+        let root = match mdast {
+            Node::Root(root) => root,
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Could not parse root node of markdown file"
+                ))
+            }
+        };
+
+        Ok(root)
+    }
+
     /// Find all links in a Markdown document.
     ///
     /// # Arguments
@@ -100,16 +135,24 @@ impl<'a> MarkdownProcessor<'a> {
     /// * `md_file` - The Markdown file to search for links.
     ///
     /// Returns: Vec<DocumentLink>
-    fn find_links(&self, md_file: &MarkdownFile) -> Vec<DocumentLink> {
+    fn find_links(&self, contents: &str) -> Vec<DocumentLink> {
         let mut result: Vec<DocumentLink> = Vec::new();
         fn find_impl(result: &mut Vec<DocumentLink>, children: &Vec<Node>) {
             for child in children {
                 match child {
+                    // Normal link in form [a](b)
                     Node::Link(link) => {
                         let pos = link.position.as_ref().unwrap();
                         let url_end = pos.end.offset - 1;
                         let url_start = url_end - link.url.len();
                         result.push(DocumentLink(url_start, url_end, link.url.clone()));
+                    }
+                    // Images in form ![a](b)
+                    Node::Image(image) => {
+                        let pos = image.position.as_ref().unwrap();
+                        let url_end = pos.end.offset - 1;
+                        let url_start = url_end - image.url.len();
+                        result.push(DocumentLink(url_start, url_end, image.url.clone()));
                     }
                     _ => {
                         if let Some(children) = child.children() {
@@ -120,7 +163,7 @@ impl<'a> MarkdownProcessor<'a> {
             }
         }
 
-        let mdast = md_file.md_ast().unwrap();
+        let mdast = self.get_md_ast(contents).unwrap();
 
         find_impl(&mut result, &mdast.children);
 
@@ -139,16 +182,18 @@ impl<'a> MarkdownProcessor<'a> {
     /// * `proj_file_path` - The path of the Markdown file.
     /// * `root_url` - The root URL of the target in TIM.
     /// * `md_file` - Information about the Markdown file to process.
+    /// * `upload_files_map` - Map of files to upload to TIM and their uploaded filenames.
     fn resolve_relative_urls(
         &self,
         contents: &mut String,
         project_dir: &Path,
         proj_file_path: &PathBuf,
         root_url: &String,
-        md_file: &MarkdownFile,
-    ) {
-        let links = self.find_links(md_file);
+        tim_path: &str,
+    ) -> HashMap<String, String> {
+        let links = self.find_links(contents);
         let mut start_offset = 0isize;
+        let mut upload_files_map = HashMap::new();
 
         for DocumentLink(start, end, url) in links {
             let parse_result = Url::parse(&url);
@@ -156,22 +201,39 @@ impl<'a> MarkdownProcessor<'a> {
 
             match parse_result {
                 Err(ParseError::RelativeUrlWithoutBase) => {
-                    let (fixed_url, base_url) = if url.starts_with("/") {
+                    let (base_url, path_part) = if url.starts_with("/") {
                         let url = &url[1..];
-                        (url, Url::from_directory_path(project_dir).unwrap())
+                        (Url::from_directory_path(project_dir).unwrap(), url)
                     } else {
-                        (url.as_str(), Url::from_file_path(proj_file_path).unwrap())
+                        (Url::from_file_path(proj_file_path).unwrap(), url.as_str())
                     };
-                    let mut joined = base_url.join(fixed_url).unwrap();
+                    let mut full_url = base_url.join(path_part).unwrap();
+                    let path_part = full_url.path().to_string();
 
-                    let path_part = joined.path().to_string();
-
-                    if path_part.ends_with(".md") {
-                        joined.set_path(&path_part[..path_part.len() - 3]);
-                    }
-
-                    let final_url = joined.to_string().replace(&project_url_str, "");
-                    let final_url = format!("/view/{}/{}", root_url, final_url);
+                    // TODO: This may not be enough, because we do not know if the
+                    //   .md file is being processed as a TIM document or not.
+                    //   Also, some other non-Markdown files may be processed as TIM documents.
+                    //   We need to check if the file is being processed as a TIM document
+                    //   and from there consider whether make it a relative URL or mark it
+                    //   as an upload file.
+                    let final_url = if path_part.ends_with(".md") {
+                        full_url.set_path(&path_part[..path_part.len() - 3]);
+                        let final_url = full_url.to_string().replace(&project_url_str, "");
+                        format!("/view/{}/{}", root_url, final_url)
+                    } else {
+                        // Safety: The URL is guaranteed to be a file path, and other
+                        // requirements are met for to_file_path to be safe.
+                        let full_path = full_url.to_file_path().unwrap();
+                        // Try to find and hash the file, otherwise silently skip it
+                        let Ok(tim_file_name) = generate_hashed_filename(&full_path) else {
+                            continue;
+                        };
+                        upload_files_map.insert(
+                            full_path.to_string_lossy().to_string(),
+                            tim_file_name.clone(),
+                        );
+                        format!("/files/{}/{}/{}", root_url, tim_path, tim_file_name)
+                    };
 
                     // Replace the url in the markdown from the start to the end position
                     let start = (start as isize + start_offset) as usize;
@@ -186,6 +248,8 @@ impl<'a> MarkdownProcessor<'a> {
                 }
             }
         }
+
+        upload_files_map
     }
 }
 
@@ -267,12 +331,12 @@ impl<'a> FileProcessorAPI for MarkdownProcessor<'a> {
 }
 
 impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
-    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
+    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocument> {
         // This unwrap is safe because the file was added to the processor
         // Because internal API is only called by TIMDocument, the file should always exist
         let info = self.files.get(tim_document.path).unwrap();
 
-        let mut contents = info.proj_file.contents_without_front_matter()?.to_string();
+        let contents = info.proj_file.contents_without_front_matter()?.to_string();
         let project_dir = self.project.get_root_path();
         let proj_file_path = info.proj_file.path();
         let root_url = &self
@@ -281,18 +345,6 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
             .get_target(&self.sync_target)
             .ok_or_else(|| anyhow::anyhow!("Could not find target: {}", self.sync_target))?
             .folder_root;
-
-        // TODO: Remove when other types are supported
-        #[allow(irrefutable_let_patterns)]
-        if let ProjectFile::Markdown(md_file) = &info.proj_file {
-            self.resolve_relative_urls(
-                &mut contents,
-                project_dir,
-                proj_file_path,
-                root_url,
-                md_file,
-            );
-        }
 
         let mut ctx = self
             .global_context
@@ -309,7 +361,7 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
 
         let res = self
             .renderer
-            .render_template_with_context(&contents, &ctx)
+            .render_template_with_context_return_new_context(&contents, &ctx)
             .with_context(|| {
                 format!(
                     "Could not render markdown document: {}",
@@ -317,7 +369,37 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
                 )
             })?;
 
-        Ok(res.into())
+        // TODO: Make a general context extension for this
+        let mut upload_files_map = res
+            .modified_context
+            .and_then(|c| {
+                c.data()
+                    .get(FILE_MAP_ATTRIBUTE)
+                    .and_then(|v| serde_json::from_value::<HashMap<String, String>>(v.clone()).ok())
+            })
+            .unwrap_or_default();
+
+        let mut contents = res.rendered;
+
+        // TODO: Remove when other types are supported
+        #[allow(irrefutable_let_patterns)]
+        if let ProjectFile::Markdown(_) = &info.proj_file {
+            // For markdown files, we resolve relative URLs whenever possible.
+            // While resolving, we may find additional files to upload
+            let additional_upload_files = self.resolve_relative_urls(
+                &mut contents,
+                project_dir,
+                proj_file_path,
+                root_url,
+                tim_document.path,
+            );
+            upload_files_map.extend(additional_upload_files);
+        }
+
+        Ok(PreparedDocument {
+            markdown: contents,
+            upload_files: upload_files_map,
+        })
     }
 
     fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value> {
@@ -336,7 +418,7 @@ impl<'a> FileProcessorInternalAPI for MarkdownProcessor<'a> {
                 .path()
                 .relativize(self.project.get_root_path())
                 .to_string_lossy()
-                .to_string()
+                .to_string(),
         )
     }
 }

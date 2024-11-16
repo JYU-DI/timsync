@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::collections::HashMap;
 
 use anyhow::Context;
 use lazy_regex::regex;
@@ -6,16 +6,22 @@ use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
 /// A Markdown document contents that are ready to be uploaded to TIM.
-pub struct PreparedDocumentMarkdown(String);
+pub struct PreparedDocument {
+    /// Markdown contents of the document
+    pub markdown: String,
+    /// Map of files to upload.
+    /// Keys are full resolved paths to the files, values are final filenames of the files in TIM
+    pub upload_files: HashMap<String, String>,
+}
 
-impl PreparedDocumentMarkdown {
+impl PreparedDocument {
     /// Calculates the SHA1 hash of the markdown.
     /// This is used to check if the markdown has changed.
     ///
     /// returns: String
     pub fn sha1(&self) -> String {
         let mut hasher = Sha1::new();
-        hasher.update(self.0.as_bytes());
+        hasher.update(self.markdown.as_bytes());
         let result = hasher.finalize();
         format!("{:x}", result)
     }
@@ -24,14 +30,17 @@ impl PreparedDocumentMarkdown {
     /// The timestamp is stored in the settings block of the markdown.
     ///
     /// returns: PreparedMarkdown
-    pub fn with_timestamp(&self) -> PreparedDocumentMarkdown {
+    pub fn with_timestamp(self) -> PreparedDocument {
         let sha1 = self.sha1();
         // prepend the timestamp to the markdown
-        Self(format!(
-            "{}\n\n{}",
-            TimSyncDocSettings::new(sha1).to_markdown(),
-            self.0
-        ))
+        Self {
+            markdown: format!(
+                "{}\n\n{}",
+                TimSyncDocSettings::new(sha1).to_markdown(),
+                self.markdown
+            ),
+            upload_files: self.upload_files,
+        }
     }
 
     /// Checks if the timestamp in the markdown equals the hash in the given markdown.
@@ -54,26 +63,6 @@ impl PreparedDocumentMarkdown {
             }
             None => false,
         }
-    }
-}
-
-impl From<PreparedDocumentMarkdown> for String {
-    fn from(markdown: PreparedDocumentMarkdown) -> Self {
-        markdown.0
-    }
-}
-
-impl Deref for PreparedDocumentMarkdown {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<String> for PreparedDocumentMarkdown {
-    fn from(markdown: String) -> Self {
-        Self(markdown)
     }
 }
 

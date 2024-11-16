@@ -2,8 +2,6 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use lazy_init::Lazy;
-use markdown::mdast::{Node, Root};
-use markdown::{Constructs, ParseOptions};
 
 use crate::processing::processors::FileProcessorType;
 use crate::project::files::project_files::ProjectFileAPI;
@@ -49,40 +47,5 @@ impl MarkdownFile {
             contents: Lazy::new(),
             front_matter_position: Lazy::new(),
         }
-    }
-
-    fn get_md_ast(&self, contents: &str) -> Result<Root> {
-        // This cannot fail, see https://docs.rs/markdown/1.0.0-alpha.14/markdown/fn.to_mdast.html
-        let mdast = markdown::to_mdast(
-            &contents,
-            &ParseOptions {
-                constructs: Constructs {
-                    frontmatter: true,
-                    ..Constructs::default()
-                },
-                ..ParseOptions::default()
-            },
-        )
-        .unwrap();
-
-        let root = match mdast {
-            Node::Root(root) => root,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Could not parse root node of markdown file"
-                ))
-            }
-        };
-
-        Ok(root)
-    }
-
-    /// Get the parsed markdown abstract syntax tree (AST) of the markdown file.
-    ///
-    /// Returns: Result<Root>
-    pub fn md_ast(&self) -> Result<Root> {
-        let api: &dyn ProjectFileAPI = self;
-        let contents = api.contents_without_front_matter()?;
-        self.get_md_ast(contents)
     }
 }

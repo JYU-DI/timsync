@@ -7,7 +7,7 @@ use indoc::indoc;
 use serde_json::{Map, Value};
 
 use crate::processing::markdown_processor::MarkdownProcessor;
-use crate::processing::prepared_markdown::PreparedDocumentMarkdown;
+use crate::processing::prepared_document::PreparedDocument;
 use crate::processing::processors::{FileProcessorAPI, FileProcessorInternalAPI};
 use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
@@ -102,13 +102,10 @@ impl<'a> FileProcessorAPI for StyleThemeProcessor<'a> {
 }
 
 impl<'a> FileProcessorInternalAPI for StyleThemeProcessor<'a> {
-    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocumentMarkdown> {
-        let processed_style: String = self
-            .markdown_processor
-            .render_tim_document(tim_document)?
-            .into();
+    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocument> {
+        let processed_style_doc = self.markdown_processor.render_tim_document(tim_document)?;
 
-        let res = format!(
+        let final_markdown = format!(
             indoc! {r#"
             ``` {{settings=""}}
             description: "{}"
@@ -118,11 +115,13 @@ impl<'a> FileProcessorInternalAPI for StyleThemeProcessor<'a> {
             {}
             ```"#
             },
-            tim_document.title,
-            processed_style.trim()
+            tim_document.title, processed_style_doc.markdown
         );
 
-        Ok(res.into())
+        Ok(PreparedDocument {
+            markdown: final_markdown,
+            upload_files: processed_style_doc.upload_files,
+        })
     }
 
     fn get_project_file_front_matter_json(&self, tim_document: &TIMDocument) -> Result<Value> {
@@ -131,6 +130,7 @@ impl<'a> FileProcessorInternalAPI for StyleThemeProcessor<'a> {
     }
 
     fn get_project_file_local_path(&self, tim_document: &TIMDocument) -> Option<String> {
-        self.markdown_processor.get_project_file_local_path(tim_document)
+        self.markdown_processor
+            .get_project_file_local_path(tim_document)
     }
 }

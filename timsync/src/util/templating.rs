@@ -1,14 +1,18 @@
 use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
 use crate::project::project::Project;
+use crate::util::path;
 use crate::util::path::{NormalizeExtension, RelativizeExtension};
 use anyhow::{Context as AnyhowCtx, Result};
 use handlebars::{
-    Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext,
-    RenderErrorReason, Renderable,
+    Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext, RenderError,
+    RenderErrorReason, Renderable, StringOutput, Template,
 };
 use nanoid::nanoid;
 use serde_json::{json, Map, Value};
-use std::path::Path;
+use std::io::Error as IOError;
+use std::io::Write;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
 
 /// Area block helper.
 /// Surrounds the content into an area. Areas can be collapsed.
@@ -293,40 +297,8 @@ fn include_helper<'reg, 'rc>(
         .map(|v| v.value().is_truthy(true))
         .unwrap_or(true);
 
-    let site_ctx_json = _get_site_ctx_json(ctx)?;
-    let local_project_dir = site_ctx_json
-        .get("local_project_dir")
-        .expect("Local project directory is not set")
-        .as_str()
-        .expect("Local project directory is not a string");
-
-    let target_file_path = if file_path.starts_with("/") {
-        // Absolute path, resolve from project root
-        Path::new(local_project_dir).join(&file_path[1..])
-    } else {
-        // Relative path, resolve from current file
-        let local_file_path = ctx
-            .data()
-            .get("local_file_path")
-            .ok_or_else(|| RenderErrorReason::Other("Local file path is not set".to_string()))?
-            .as_str()
-            .ok_or_else(|| {
-                RenderErrorReason::Other("Local file path is not a string".to_string())
-            })?;
-
-        Path::new(local_project_dir)
-            .join(local_file_path)
-            .parent()
-            .ok_or_else(|| {
-                RenderErrorReason::Other(
-                    "Could not get parent directory of the local file path to resolve relative path".to_string(),
-                )
-            })?
-            .join(&file_path)
-            .to_path_buf()
-    };
-    // Normalize by removing redundant components and up-level references
-    let target_file_path = target_file_path.normalize();
+    let local_project_dir = _get_local_project_dir(ctx)?;
+    let target_file_path = _resolve_full_file_path(ctx, file_path, local_project_dir)?;
 
     if !target_file_path.is_file() {
         return Err(RenderErrorReason::Other(format!(
@@ -373,6 +345,132 @@ fn include_helper<'reg, 'rc>(
     Ok(())
 }
 
+fn _resolve_full_file_path(
+    ctx: &Context,
+    file_path: &str,
+    local_project_dir: &str,
+) -> Result<PathBuf, RenderError> {
+    let target_file_path = if file_path.starts_with("/") {
+        // Absolute path, resolve from project root
+        Path::new(local_project_dir).join(&file_path[1..])
+    } else {
+        // Relative path, resolve from current file
+        let local_file_path = ctx
+            .data()
+            .get("local_file_path")
+            .ok_or_else(|| RenderErrorReason::Other("Local file path is not set".to_string()))?
+            .as_str()
+            .ok_or_else(|| {
+                RenderErrorReason::Other("Local file path is not a string".to_string())
+            })?;
+
+        Path::new(local_project_dir)
+            .join(local_file_path)
+            .parent()
+            .ok_or_else(|| {
+                RenderErrorReason::Other(
+                    "Could not get parent directory of the local file path to resolve relative path".to_string(),
+                )
+            })?
+            .join(&file_path)
+            .to_path_buf()
+    };
+    // Normalize by removing redundant components and up-level references
+    let target_file_path = target_file_path.normalize();
+    Ok(target_file_path)
+}
+
+fn _get_local_project_dir(ctx: &Context) -> Result<&str, RenderError> {
+    let site_ctx_json = _get_site_ctx_json(ctx)?;
+    let local_project_dir = site_ctx_json
+        .get("local_project_dir")
+        .expect("Local project directory is not set")
+        .as_str()
+        .expect("Local project directory is not a string");
+    Ok(local_project_dir)
+}
+
+pub const FILE_MAP_ATTRIBUTE: &str = "$_timsync_upload_files";
+
+/// File helper.
+/// The helper is used to convert a file path to the final URL of the file and to
+/// explicitly mark the file to be uploaded into the current document.
+///
+/// In Markdown files, this CLI tool will try to automatically find references to files
+/// and upload them to the TIM server. In cases where automatic detection fails, the file helper
+/// can be used to explicitly mark the file for upload.
+///
+/// Example:
+///
+/// ```md
+/// Relative import: ![]({{file "path/to/file.ext"}})
+///
+/// Absolute import: ![]({{file "/path/to/file.ext"}})
+/// ```
+fn file_helper<'reg, 'rc>(
+    h: &Helper<'rc>,
+    _: &'reg Handlebars<'reg>,
+    ctx: &'rc Context,
+    rc: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let file_path = h
+        .param(0)
+        .ok_or_else(|| RenderErrorReason::ParamNotFoundForIndex("path", 0))?
+        .value()
+        .as_str()
+        .ok_or_else(|| {
+            RenderErrorReason::ParamTypeMismatchForName(
+                "path",
+                "0".to_string(),
+                "string".to_string(),
+            )
+        })?;
+
+    let site_ctx_json = _get_site_ctx_json(ctx)?;
+    let base_path = site_ctx_json
+        .get("base_path")
+        .expect("Base path is not set")
+        .as_str()
+        .expect("Base path is not a string");
+    let tim_doc_path =
+        ctx.data().get("path").ok_or_else(|| {
+            RenderErrorReason::Other(
+                "To use the 'file' helper, the template must have 'path' attribute available in context".to_string(),
+            )
+        })?.as_str().ok_or_else(|| {
+            RenderErrorReason::Other(
+                "To use the 'file' helper, the 'path' attribute in context must be a string".to_string(),
+            )
+        })?;
+
+    let local_project_dir = _get_local_project_dir(ctx)?;
+    let target_file_path = _resolve_full_file_path(ctx, file_path, local_project_dir)?;
+    let tim_file_name = path::generate_hashed_filename(&target_file_path)
+        .map_err(|e| RenderErrorReason::Other(e.to_string()))?;
+
+    let mut ctx = rc.context().as_deref().unwrap_or(ctx).clone();
+    if let Some(ref mut m) = ctx.data_mut().as_object_mut() {
+        let files_map = m
+            .entry(FILE_MAP_ATTRIBUTE)
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or_else(|| RenderErrorReason::Other("Files map is not an object".to_string()))?;
+        files_map.insert(
+            target_file_path.to_string_lossy().to_string(),
+            Value::String(tim_file_name.clone()),
+        );
+    }
+    rc.set_context(ctx);
+
+    out.write(&format!(
+        "/files/{}/{}/{}",
+        base_path, tim_doc_path, tim_file_name
+    ))?;
+
+    Ok(())
+}
+
 fn _get_site_ctx_json(ctx: &Context) -> Result<&Map<String, Value>, RenderErrorReason> {
     ctx.data()
         .get("site")
@@ -389,6 +487,11 @@ where
     ///
     /// returns: &Self
     fn with_tim_doc_templates(self) -> Self;
+
+    /// Extend the renderer instance with the file helpers.
+    ///
+    /// returns: &Self
+    fn with_file_helpers(self) -> Self;
 
     /// Extend the renderer instance with the project templates.
     /// The templates may be used as partials in the rendering process.
@@ -427,8 +530,13 @@ impl TimRendererExt for Handlebars<'_> {
         self.register_helper("docsettings", Box::new(docsettings_block));
         self.register_helper("ref_area", Box::new(ref_area_helper));
         self.register_helper("task", Box::new(task_helper));
-        self.register_helper("include", Box::new(include_helper));
         handlebars_misc_helpers::register(&mut self);
+        self.with_file_helpers()
+    }
+
+    fn with_file_helpers(mut self) -> Self {
+        self.register_helper("include", Box::new(include_helper));
+        self.register_helper("file", Box::new(file_helper));
         self
     }
 
@@ -500,5 +608,95 @@ pub trait ContextExtension {
 impl ContextExtension for Context {
     fn extend_with_json(&mut self, other: &Value) {
         self.data_mut().merge(other);
+    }
+}
+
+pub struct RenderResult<T> {
+    pub rendered: T,
+    pub modified_context: Option<Context>,
+}
+
+pub trait RendererExtension {
+    fn render_template_with_context_to_output_return_new_context(
+        &self,
+        template_string: &str,
+        ctx: &Context,
+        output: &mut impl Output,
+    ) -> Result<RenderResult<()>, RenderError>;
+
+    fn render_template_with_context_return_new_context(
+        &self,
+        template_string: &str,
+        ctx: &Context,
+    ) -> Result<RenderResult<String>, RenderError> {
+        let mut out = StringOutput::new();
+        let res = self.render_template_with_context_to_output_return_new_context(
+            template_string,
+            ctx,
+            &mut out,
+        )?;
+        Ok(RenderResult {
+            rendered: out.into_string().map_err(RenderError::from)?,
+            modified_context: res.modified_context,
+        })
+    }
+
+    fn render_template_with_context_to_write_return_new_context<W>(
+        &self,
+        template_string: &str,
+        ctx: &Context,
+        writer: W,
+    ) -> Result<RenderResult<()>, RenderError>
+    where
+        W: Write,
+    {
+        let mut out = WriteOutput::new(writer);
+        let res = self.render_template_with_context_to_output_return_new_context(
+            template_string,
+            ctx,
+            &mut out,
+        )?;
+        Ok(RenderResult {
+            rendered: (),
+            modified_context: res.modified_context,
+        })
+    }
+}
+
+pub struct WriteOutput<W: Write> {
+    write: W,
+}
+
+impl<W: Write> Output for WriteOutput<W> {
+    fn write(&mut self, seg: &str) -> Result<(), IOError> {
+        self.write.write_all(seg.as_bytes())
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> Result<(), IOError> {
+        self.write.write_fmt(args)
+    }
+}
+
+impl<W: Write> WriteOutput<W> {
+    pub fn new(write: W) -> WriteOutput<W> {
+        WriteOutput { write }
+    }
+}
+
+impl RendererExtension for Handlebars<'_> {
+    fn render_template_with_context_to_output_return_new_context(
+        &self,
+        template_string: &str,
+        ctx: &Context,
+        output: &mut impl Output,
+    ) -> Result<RenderResult<()>, RenderError> {
+        let tpl = Template::compile(template_string).map_err(RenderError::from)?;
+        let mut render_context = RenderContext::new(None);
+        tpl.render(self, ctx, &mut render_context, output)?;
+
+        Ok(RenderResult {
+            rendered: (),
+            modified_context: render_context.context().map(|c| c.deref().clone()),
+        })
     }
 }

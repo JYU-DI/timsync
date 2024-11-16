@@ -1,5 +1,5 @@
 use std::cell::OnceCell;
-use std::collections::{HashMap, LinkedList};
+use std::collections::{HashMap, HashSet, LinkedList};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -412,16 +412,36 @@ impl<'a> SyncPipeline<'a> {
 
             progress_bar.set_message(format!("Uploading document: {}", doc_path));
 
-            let doc_markdown = doc.render_contents()?;
-            let current_doc_markdown = client.download_markdown(&doc_path).await?;
+            let prepared_doc = doc.render_contents()?;
 
-            if doc_markdown.timestamp_equals(&current_doc_markdown) {
-                return Ok::<(), Error>(());
+            // Upload files
+            if !prepared_doc.upload_files.is_empty() {
+                let existing_files = client.get_document_uploads(&doc_path).await?;
+                let existing_files = existing_files
+                    .into_iter()
+                    .map(|f| f.filename)
+                    .collect::<HashSet<_>>();
+
+                // TODO: Parallelize file uploads
+                for (file_path, tim_file_name) in prepared_doc.upload_files.iter() {
+                    // Don't re-upload files that already exist
+                    if existing_files.contains(tim_file_name) {
+                        continue;
+                    }
+                    client
+                        .upload_file(&doc_path, file_path, tim_file_name)
+                        .await?;
+                }
             }
 
-            client
-                .upload_markdown(&doc_path, &doc_markdown.with_timestamp())
-                .await?;
+            let current_doc_markdown = client.download_markdown(&doc_path).await?;
+
+            if !prepared_doc.timestamp_equals(&current_doc_markdown) {
+                let doc_markdown = prepared_doc.with_timestamp();
+                client
+                    .upload_markdown(&doc_path, &doc_markdown.markdown)
+                    .await?;
+            }
 
             progress_bar.inc(1);
 
