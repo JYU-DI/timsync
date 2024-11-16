@@ -22,7 +22,7 @@ use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
-use crate::util::templating::Merge;
+use crate::util::json::Merge;
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
 
 #[derive(Debug, Args)]

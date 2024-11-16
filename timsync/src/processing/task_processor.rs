@@ -14,10 +14,10 @@ use crate::processing::tim_document::TIMDocument;
 use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
+use crate::templating::ext_context::ContextExtension;
+use crate::templating::ext_render_with_context::RendererExtension;
+use crate::templating::tim_handlebars::{TimRendererExt, FILE_MAP_ATTRIBUTE};
 use crate::util::path::RelativizeExtension;
-use crate::util::templating::{
-    ContextExtension, RendererExtension, TimRendererExt, FILE_MAP_ATTRIBUTE,
-};
 use crate::util::tim_client::random_par_id;
 
 struct TaskInfo {

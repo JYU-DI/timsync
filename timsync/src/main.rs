@@ -14,6 +14,7 @@ mod commands;
 mod processing;
 mod project;
 mod util;
+mod templating;
 
 shadow!(build);
 
