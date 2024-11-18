@@ -20,7 +20,7 @@ use std::path::Path;
 ///
 /// Absolute include {{include "/path/to/file.md"}}
 ///
-/// Include without templating {{include "path/to/file.md" template=false}}
+/// Include with templating {{include "path/to/file.md" template=true}}
 /// ```
 pub fn include_helper<'reg, 'rc>(
     h: &Helper<'rc>,
@@ -45,7 +45,7 @@ pub fn include_helper<'reg, 'rc>(
     let do_template = h
         .hash_get("template")
         .map(|v| v.value().is_truthy(true))
-        .unwrap_or(true);
+        .unwrap_or(false);
 
     let local_project_dir = get_local_project_dir(ctx)?;
     let target_file_path = resolve_full_file_path(ctx, file_path, local_project_dir)?;
