@@ -5,6 +5,8 @@ use crate::templating::helpers::file::file_helper;
 use crate::templating::helpers::include::include_helper;
 use crate::templating::helpers::ref_area::ref_area_helper;
 use crate::templating::helpers::task::task_helper;
+use crate::templating::helpers::task_id::task_id_helper;
+use crate::templating::helpers::url_for::url_for_helper;
 use anyhow::Context;
 use handlebars::Handlebars;
 
@@ -60,6 +62,8 @@ impl TimRendererExt for Handlebars<'_> {
         self.register_helper("docsettings", Box::new(docsettings_block));
         self.register_helper("ref_area", Box::new(ref_area_helper));
         self.register_helper("task", Box::new(task_helper));
+        self.register_helper("task_id", Box::new(task_id_helper));
+        self.register_helper("url_for", Box::new(url_for_helper));
         handlebars_misc_helpers::register(&mut self);
         self.with_file_helpers()
     }
