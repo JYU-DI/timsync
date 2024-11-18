@@ -50,7 +50,7 @@ pub const TASKS_DOCPATH: &str = "_project_tasks";
 pub const TASKS_TITLE: &str = "Project tasks";
 /// UID of the generated tasks document.
 /// Used by the templating engine to implement the `task` helper.
-pub const TASKS_UID: &str = "_timsync_tasks_doc";
+pub const TASKS_UID: &str = "_timsync_tasks";
 /// Key for the tasks reference map in the global context.
 /// Used by the templating engine to implement the `task` helper.
 pub const TASKS_REF_MAP_KEY: &str = "_timsync_tasks_ref_map";
@@ -69,6 +69,13 @@ struct TaskSettings {
     /// ```
     /// ````
     plugin_attributes: Option<Map<String, Value>>,
+    /// Additional classes to be added to the plugin paragraph. Optional.
+    /// The value will be added to the paragraph as such:
+    /// ````
+    /// ``` {.class1 .class2 ...}
+    /// ```
+    /// ````
+    class: Option<Vec<String>>,
 }
 
 impl<'a> TaskProcessor<'a> {
@@ -201,6 +208,10 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
                     )
                     .context("Could not write plugin attribute")?;
                 }
+            }
+            if let Some(class_list) = &task_info.task_settings.class {
+                write!(result_buf, ".{} ", class_list.join(" ."))
+                    .context("Could not write plugin class")?;
             }
             write!(result_buf, "}}\n\n").context("Could not write plugin paragraph")?;
 
