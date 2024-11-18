@@ -97,7 +97,7 @@ impl RendererExtension for Handlebars<'_> {
         output: &mut impl Output,
     ) -> Result<RenderResult<()>, RenderError> {
         let tpl = Template::compile(template_string).map_err(RenderError::from)?;
-        let mut render_context = RenderContext::new(None);
+        let mut render_context = RenderContext::new(tpl.name.as_ref());
         tpl.render(self, ctx, &mut render_context, output)?;
 
         Ok(RenderResult {
