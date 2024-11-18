@@ -3,12 +3,12 @@
 TIMSync is a tool to sync local documents with TIM.
 
 The tool is aimed to allow authoring and managing documents easily outside of TIM.
-The features will include (checked items are implemented):
+The features include:
 
-- [x] Managing multiple sync targets (local TIM, hosted TIM, different folders on the same TIM instance, etc.)
-- [x] Syncing documents to TIM automatically
-- [x] Local templating preprocessor to allow splitting document and managing them in a more modular way
-- [ ] Automatic management of course attachments (images, videos, etc.) and links
+- Managing multiple sync targets (local TIM, hosted TIM, different folders on the same TIM instance, etc.)
+- Syncing documents to TIM automatically
+- Local templating preprocessor to allow splitting document and managing them in a more modular way
+- Automatic management of course attachments (images, videos, etc.) and links
 
 See the [issue tracker](https://github.com/JYU-DI/timsync/issues?q=is%3Aissue+is%3Aopen+label%3Afeature) for more
 planned features.
