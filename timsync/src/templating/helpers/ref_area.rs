@@ -56,7 +56,10 @@ pub fn ref_area_helper<'reg, 'rc>(
             )
         })?;
 
-    out.write(&format!("#- {{rd=\"{}\" ra=\"{}\"}}", doc_id, area_name))?;
+    out.write(&format!(
+        "#- {{rd=\"{}\" ra=\"{}\"}}\n\n#-",
+        doc_id, area_name
+    ))?;
 
     Ok(())
 }
