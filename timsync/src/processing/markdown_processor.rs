@@ -82,7 +82,7 @@ impl<'a> MarkdownProcessor<'a> {
         global_context: Rc<OnceCell<GlobalContext>>,
     ) -> Result<Self> {
         let renderer = Handlebars::new()
-            .with_tim_doc_templates()
+            .with_tim_doc_helpers()
             .with_project_templates(project)?
             .with_project_helpers(project)?;
 

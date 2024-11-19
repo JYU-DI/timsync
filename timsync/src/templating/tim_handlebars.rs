@@ -21,12 +21,12 @@ where
     /// Extend the renderer instance with the TIM templates for documents.
     ///
     /// returns: &Self
-    fn with_tim_doc_templates(self) -> Self;
+    fn with_tim_doc_helpers(self) -> Self;
 
     /// Extend the renderer instance with the file helpers.
     ///
     /// returns: &Self
-    fn with_file_helpers(self) -> Self;
+    fn with_base_helpers(self) -> Self;
 
     /// Extend the renderer instance with the project templates.
     /// The templates may be used as partials in the rendering process.
@@ -56,21 +56,21 @@ where
 }
 
 impl TimRendererExt for Handlebars<'_> {
-    fn with_tim_doc_templates(mut self) -> Self {
+    fn with_tim_doc_helpers(mut self) -> Self {
         self.register_escape_fn(handlebars::no_escape);
         self.register_helper("area", Box::new(area_block));
         self.register_helper("docsettings", Box::new(docsettings_block));
         self.register_helper("ref_area", Box::new(ref_area_helper));
         self.register_helper("task", Box::new(task_helper));
-        self.register_helper("task_id", Box::new(task_id_helper));
-        self.register_helper("url_for", Box::new(url_for_helper));
         handlebars_misc_helpers::register(&mut self);
-        self.with_file_helpers()
+        self.with_base_helpers()
     }
 
-    fn with_file_helpers(mut self) -> Self {
+    fn with_base_helpers(mut self) -> Self {
         self.register_helper("include", Box::new(include_helper));
         self.register_helper("file", Box::new(file_helper));
+        self.register_helper("task_id", Box::new(task_id_helper));
+        self.register_helper("url_for", Box::new(url_for_helper));
         self
     }
 

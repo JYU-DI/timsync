@@ -89,7 +89,7 @@ impl<'a> TaskProcessor<'a> {
     /// returns: Result<TaskProcessor>
     pub fn new(project: &'a Project, global_context: Rc<OnceCell<GlobalContext>>) -> Result<Self> {
         let renderer = Handlebars::new()
-            .with_file_helpers()
+            .with_base_helpers()
             .with_project_templates(project)?
             .with_project_helpers(project)?;
 
