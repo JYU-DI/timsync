@@ -371,6 +371,7 @@ impl<'a> SyncPipeline<'a> {
             "local_project_dir",
             Value::String(self.project.get_root_path().display().to_string()),
         );
+        global_context.insert("sync_target", Value::String(self.sync_target.to_string()));
 
         for (_, processor) in &self.processors {
             if let Some(context) = processor.get_processor_context() {
