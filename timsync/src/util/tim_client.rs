@@ -30,8 +30,8 @@ pub enum TimClientErrors {
     CouldNotCreateItem(String, String),
     #[error("Item {0} is not a {1}, but a {2}")]
     InvalidItemType(String, String, String),
-    #[error("Failed to process {0}: {1}")]
-    ItemError(String, String),
+    #[error("Failed to process {0}: {1}. Server answered with: {2}")]
+    ItemError(String, String, String),
     #[error("File not found: {0}")]
     FileNotFound(String),
 }
@@ -354,10 +354,12 @@ impl TimClient {
         if result.status().is_success() {
             Ok(())
         } else {
-            Err(
-                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
-                    .into(),
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
             )
+            .into())
         }
     }
 
@@ -384,10 +386,12 @@ impl TimClient {
                 .context("Could not load markdown response")?;
             Ok(markdown)
         } else {
-            Err(
-                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
-                    .into(),
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
             )
+            .into())
         }
     }
 
@@ -429,10 +433,12 @@ impl TimClient {
         if result.status().is_success() {
             Ok(())
         } else {
-            Err(
-                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
-                    .into(),
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
             )
+            .into())
         }
     }
 
@@ -471,10 +477,12 @@ impl TimClient {
                 .context("Could not parse upload info JSON")?;
             Ok(uploads)
         } else {
-            Err(
-                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
-                    .into(),
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
             )
+            .into())
         }
     }
 
@@ -525,10 +533,12 @@ impl TimClient {
         if result.status().is_success() {
             Ok(())
         } else {
-            Err(
-                TimClientErrors::ItemError(item_path.to_string(), result.status().to_string())
-                    .into(),
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
             )
+            .into())
         }
     }
 }
