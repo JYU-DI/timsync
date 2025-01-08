@@ -77,7 +77,7 @@ pub fn area_block<'reg, 'rc>(
         tmpl.render(r, ctx, rc, out)?;
     }
 
-    out.write(&format!("#- {{area_end=\"{}\"}}\n\n#-\n", area_name))?;
+    out.write(&format!("\n#- {{area_end=\"{}\"}}\n\n#-\n", area_name))?;
 
     Ok(())
 }
