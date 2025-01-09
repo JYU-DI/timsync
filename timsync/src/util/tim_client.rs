@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
 use rand::Rng;
+use rand_seeder::Seeder;
+use rand_xoshiro::rand_core::SeedableRng;
+use rand_xoshiro::Xoroshiro128PlusPlus;
 use reqwest::multipart::{Form, Part};
 use reqwest::{Body, Client, ClientBuilder, RequestBuilder};
 use serde::Deserialize;
@@ -583,11 +586,23 @@ impl TimClientBuilder {
 
 /// Generate a random valid TIM paragraph ID.
 ///
+/// returns: String
+#[allow(dead_code)]
+pub fn random_par_id() -> String {
+    hashed_par_id(None)
+}
+
+/// Generate a valid TIM paragraph ID from a given seed.
+///
 /// The generation code is based on the original TIM implementation:
 /// <https://github.com/TIM-JYU/TIM/blob/9ad39095a3d87c8a7300beb1edbf138abee60d55/timApp/document/randutils.py#L8-L45>
 ///
+/// # Arguments
+///
+/// * `hash_seed`: Optional seed for the hash. If not given, a random seed is generated.
+///
 /// returns: String
-pub fn random_par_id() -> String {
+pub fn hashed_par_id(hash_seed: Option<&str>) -> String {
     const GEN_ASCII_STR_CHARSET: &[u8] =
         b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const GEN_ASCII_STR_CHARSET_LEN: usize = GEN_ASCII_STR_CHARSET.len();
@@ -612,7 +627,12 @@ pub fn random_par_id() -> String {
         }
     }
 
-    let mut rand = rand::thread_rng();
+    // We use a reproducible RNG to allow deterministic ID generation
+    let mut rand = if let Some(seed) = hash_seed {
+        Seeder::from(seed).make_rng::<Xoroshiro128PlusPlus>()
+    } else {
+        Xoroshiro128PlusPlus::from_entropy()
+    };
     let random_id = (0..11)
         .map(|_| {
             let idx = rand.gen_range(0..GEN_ASCII_STR_CHARSET_LEN);

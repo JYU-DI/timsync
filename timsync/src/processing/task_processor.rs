@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, Context, Result};
 use handlebars::Handlebars;
+use itertools::Itertools;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
@@ -18,7 +19,7 @@ use crate::templating::ext_context::ContextExtension;
 use crate::templating::ext_render_with_context::RendererExtension;
 use crate::templating::tim_handlebars::{TimRendererExt, FILE_MAP_ATTRIBUTE};
 use crate::util::path::RelativizeExtension;
-use crate::util::tim_client::random_par_id;
+use crate::util::tim_client::hashed_par_id;
 
 struct TaskInfo {
     par_id: String,
@@ -121,10 +122,12 @@ impl<'a> FileProcessorAPI for TaskProcessor<'a> {
         let task_settings: TaskSettings = serde_yaml::from_str(file.front_matter()?)
             .context("Could not read task information from front matter")?;
 
+        let par_id = hashed_par_id(Some(&uid));
+
         self.files.insert(
             uid,
             TaskInfo {
-                par_id: random_par_id(),
+                par_id,
                 file,
                 task_settings,
             },
@@ -165,7 +168,8 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
 
         let mut upload_files_map = HashMap::new();
 
-        for (uid, task_info) in self.files.iter() {
+        // We need to ensure stable ordering of the found tasks by sorting
+        for (uid, task_info) in self.files.iter().sorted_by_key(|&(uid, _)| uid) {
             let proj_file_path = task_info
                 .file
                 .path()
