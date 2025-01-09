@@ -1,5 +1,6 @@
 use crate::processing::task_processor::{TASKS_REF_MAP_KEY, TASKS_UID};
 use crate::templating::util::get_site_ctx_json;
+use crate::util::tim_client::hashed_par_id;
 use handlebars::{
     Context, Handlebars, Helper, HelperResult, Output, RenderContext, RenderErrorReason,
 };
@@ -76,9 +77,11 @@ pub fn task_helper<'reg, 'rc>(
         RenderErrorReason::Other(format!("Task with UID '{}' is not registered in the project. Check that the UID is written correctly.", task_id))
     })?;
 
+    let par_id = hashed_par_id(Some(task_id));
+
     out.write(&format!(
-        "#- {{ rd=\"{}\" rp=\"{}\" }}\n",
-        task_doc_id, task_par_id
+        "#- {{ rd=\"{}\" rp=\"{}\" id=\"{}\" }}\n#-\n",
+        task_doc_id, task_par_id, par_id
     ))?;
 
     Ok(())
