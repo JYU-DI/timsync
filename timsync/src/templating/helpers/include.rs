@@ -5,6 +5,7 @@ use handlebars::{
     Context, Handlebars, Helper, HelperResult, JsonTruthy, Output, RenderContext, RenderErrorReason,
 };
 use serde_json::json;
+use std::ops::Deref;
 use std::path::Path;
 
 /// Include helper.
@@ -26,7 +27,7 @@ pub fn include_helper<'reg, 'rc>(
     h: &Helper<'rc>,
     r: &'reg Handlebars<'reg>,
     ctx: &'rc Context,
-    _: &mut RenderContext<'reg, 'rc>,
+    rc: &mut RenderContext<'reg, 'rc>,
     out: &mut dyn Output,
 ) -> HelperResult {
     let file_path = h
@@ -73,7 +74,10 @@ pub fn include_helper<'reg, 'rc>(
             .to_string();
         // Create a new context with the local file path set to the included file
         // This allows the included file to use include helper itself
-        let mut ctx = ctx.clone();
+        let mut ctx = rc
+            .context()
+            .map(|c| c.deref().clone())
+            .unwrap_or_else(|| ctx.clone());
         ctx.extend_with_json(&json!({
             "local_file_path": new_local_file_path
         }));
