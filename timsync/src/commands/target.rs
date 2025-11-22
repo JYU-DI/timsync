@@ -73,6 +73,7 @@ pub async fn prompt_user_details_interactive() -> Result<Option<SyncTarget>> {
             folder_root,
             username,
             password,
+            main_language: None,
         }));
     }
 }

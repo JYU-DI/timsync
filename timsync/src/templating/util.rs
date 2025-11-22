@@ -57,6 +57,15 @@ pub fn get_site_ctx_json(ctx: &Context) -> anyhow::Result<&Map<String, Value>, R
         .ok_or_else(|| RenderErrorReason::Other("Site context data is not an object".to_string()))
 }
 
+pub fn get_original_doc_id(ctx: &Context) -> Option<u64> {
+    ctx.data()
+        .get("doc")
+        .and_then(|doc| doc.as_object())
+        .and_then(|doc| doc.get("tasks"))
+        .and_then(|info| info.get("original_doc_id"))
+        .and_then(|id| id.as_u64())
+}
+
 // Copied from handlebars::output::WriteOutput as it is not public
 pub struct WriteOutput<W: Write> {
     write: W,

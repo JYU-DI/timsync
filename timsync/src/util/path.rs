@@ -96,6 +96,88 @@ impl FullExtension for PathBuf {
     }
 }
 
+pub trait LanguageCodeExtraction {
+    /// Extract the language code from the filename in the format `[lang]`.
+    /// Returns the language code if found (e.g., "en-US" from "file[en-US].md").
+    fn extract_language_code(&self) -> Option<String>;
+
+    /// Strip the language code from the filename and return a normalized path.
+    /// Example: "file[en-US].md" -> "file.md"
+    fn strip_language_code(&self) -> PathBuf;
+
+    /// Add a language code to the filename and return a normalized path.
+    /// Example: "file.md" -> "file[en-US].md"
+    fn with_language_code(&self, lang_code: &str) -> PathBuf;
+}
+
+impl LanguageCodeExtraction for PathBuf {
+    fn extract_language_code(&self) -> Option<String> {
+        let file_name = self.file_name()?.to_str()?;
+
+        // Match pattern [lang] where lang is [a-zA-Z\-\_]+
+        let start = file_name.find('[')?;
+        let end = file_name.find(']')?;
+
+        if end <= start + 1 {
+            return None;
+        }
+
+        let lang_code = &file_name[start + 1..end];
+
+        // Validate language code format
+        if lang_code
+            .chars()
+            .all(|c| c.is_ascii_alphabetic() || c == '-' || c == '_')
+        {
+            Some(lang_code.to_string())
+        } else {
+            None
+        }
+    }
+
+    fn strip_language_code(&self) -> PathBuf {
+        let Some(file_name) = self.file_name() else {
+            return self.clone();
+        };
+
+        let Some(file_name_str) = file_name.to_str() else {
+            return self.clone();
+        };
+
+        // Find and remove [lang] pattern
+        if let Some(start) = file_name_str.find('[') {
+            if let Some(end) = file_name_str.find(']') {
+                if end > start {
+                    let before = &file_name_str[..start];
+                    let after = &file_name_str[end + 1..];
+                    let new_name = format!("{}{}", before, after);
+                    return self.with_file_name(new_name);
+                }
+            }
+        }
+
+        self.clone()
+    }
+
+    fn with_language_code(&self, lang_code: &str) -> PathBuf {
+        let Some(full_extension) = self
+            .full_extension()
+            .map(|ext| ext.to_string_lossy().to_string())
+        else {
+            return self.clone();
+        };
+
+        // full extension does not have a leading dot, so we need to remove that too
+        let file_name_no_extension = self.file_prefix().unwrap().to_string_lossy().to_string();
+
+        let new_name = format!(
+            "{}[{}].{}",
+            file_name_no_extension, lang_code, full_extension
+        );
+        self.with_file_name(new_name)
+    }
+}
+
 pub trait NormalizeExtension {
     /// Normalize the path by removing any `.` and `..` components.
     ///

@@ -55,6 +55,11 @@ pub struct SyncTarget {
     /// Currently, authentication information is stored in plain text in the config file.
     /// Instead, create a separate, new TIM account for this purpose.
     pub password: String,
+
+    /// The main language to use when syncing documents.
+    ///
+    /// This is the language type set in the document when syncing without an explicit language specified.
+    pub main_language: Option<String>,
 }
 
 impl SyncConfig {

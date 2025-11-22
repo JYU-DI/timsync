@@ -12,7 +12,7 @@ use lazy_init::Lazy;
 ///
 /// Returns: Result<&str>
 pub fn get_or_read_file_contents<'a>(
-    path: &'a PathBuf,
+    path: PathBuf,
     lazy: &'a Lazy<Result<String>>,
 ) -> Result<&'a str> {
     let res = lazy.get_or_create(|| {

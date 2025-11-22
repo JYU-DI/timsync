@@ -85,10 +85,15 @@ impl<'a> TaskProcessor<'a> {
     /// # Arguments
     ///
     /// * `project` - The project to process.
+    /// * `language` - Language to sync.
     /// * `global_context` - The global context to use for the processor.
     ///
     /// returns: Result<TaskProcessor>
-    pub fn new(project: &'a Project, global_context: Rc<OnceCell<GlobalContext>>) -> Result<Self> {
+    pub fn new(
+        project: &'a Project,
+        _language: Option<&str>,
+        global_context: Rc<OnceCell<GlobalContext>>,
+    ) -> Result<Self> {
         let renderer = Handlebars::new()
             .with_base_helpers()
             .with_project_templates(project)?
@@ -151,12 +156,13 @@ impl<'a> FileProcessorAPI for TaskProcessor<'a> {
             title: TASKS_TITLE,
             path: TASKS_DOCPATH,
             id: None,
+            original_id: None,
         }]
     }
 }
 
 impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
-    fn render_tim_document(&self, _: &TIMDocument) -> Result<PreparedDocument> {
+    fn render_tim_document(&self, tim_document: &TIMDocument) -> Result<PreparedDocument> {
         // This processor produces only one document.
         // Idea:
         // 1. Iterate over all project files and pass them through the Handlebars renderer
@@ -167,6 +173,13 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
         let project_root_dir = self.project.get_root_path();
 
         let mut upload_files_map = HashMap::new();
+
+        // If this is a translation, prefix task IDs with the original document ID
+        let task_id_prefix = if let Some(original_id) = tim_document.original_id {
+            format!("{}.", original_id)
+        } else {
+            String::new()
+        };
 
         // We need to ensure stable ordering of the found tasks by sorting
         for (uid, task_info) in self.files.iter().sorted_by_key(|&(uid, _)| uid) {
@@ -195,8 +208,8 @@ impl<'a> FileProcessorInternalAPI for TaskProcessor<'a> {
 
             write!(
                 result_buf,
-                "``` {{#{}  id=\"{}\" plugin=\"{}\" ",
-                uid, task_info.par_id, task_info.task_settings.plugin
+                "``` {{#{}{}  id=\"{}\" plugin=\"{}\" ",
+                task_id_prefix, uid, task_info.par_id, task_info.task_settings.plugin
             )
             .context("Could not write plugin paragraph")?;
             if let Some(attr_map) = &task_info.task_settings.plugin_attributes {

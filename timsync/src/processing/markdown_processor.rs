@@ -62,6 +62,9 @@ pub struct MarkdownProcessor<'a> {
 
     /// Reference to the shared global context of the project.
     global_context: Rc<OnceCell<GlobalContext>>,
+
+    /// Language to sync.
+    language: Option<String>,
 }
 
 /// Struct to store a link (relative or absolute) in a Markdown document.
@@ -74,11 +77,14 @@ impl<'a> MarkdownProcessor<'a> {
     ///
     /// * `project` - Reference to the project that is being processed.
     /// * `sync_target` - Sync target to which the documents are being synced.
+    /// * `language` - Language to sync.
+    /// * `global_context` - Reference to the shared global context.
     ///
     /// Returns: MarkdownProcessor
     pub fn new(
         project: &'a Project,
         sync_target: &str,
+        language: Option<&str>,
         global_context: Rc<OnceCell<GlobalContext>>,
     ) -> Result<Self> {
         let renderer = Handlebars::new()
@@ -92,6 +98,7 @@ impl<'a> MarkdownProcessor<'a> {
             sync_target: sync_target.to_string(),
             renderer,
             global_context,
+            language: language.map(|s| s.to_string()),
         })
     }
 
@@ -218,8 +225,24 @@ impl<'a> MarkdownProcessor<'a> {
                     //   as an upload file.
                     let final_url = if path_part.ends_with(".md") {
                         full_url.set_path(&path_part[..path_part.len() - 3]);
+
+                        // Also optionally strip lang code (the [...] part from the end if present)
+                        // We already have the correct lang code, so we can just strip it here
+                        let path_part = full_url.path().to_string();
+                        if let Some(start) = path_part.rfind("[") {
+                            if let Some(end) = path_part.rfind("]") {
+                                if start < end {
+                                    full_url.set_path(&path_part[..start]);
+                                }
+                            }
+                        }
+
                         let final_url = full_url.to_string().replace(&project_url_str, "");
-                        format!("/view/{}/{}", root_url, final_url)
+                        if let Some(language) = &self.language {
+                            format!("/view/{}/{}/{}", root_url, final_url, language)
+                        } else {
+                            format!("/view/{}/{}", root_url, final_url)
+                        }
                     } else {
                         // Safety: The URL is guaranteed to be a file path, and other
                         // requirements are met for to_file_path to be safe.
@@ -232,7 +255,14 @@ impl<'a> MarkdownProcessor<'a> {
                             full_path.to_string_lossy().to_string(),
                             tim_file_name.clone(),
                         );
-                        format!("/files/{}/{}/{}", root_url, tim_path, tim_file_name)
+                        if let Some(language) = &self.language {
+                            format!(
+                                "/files/{}/{}/{}/{}",
+                                root_url, tim_path, language, tim_file_name
+                            )
+                        } else {
+                            format!("/files/{}/{}/{}", root_url, tim_path, tim_file_name)
+                        }
                     };
 
                     // Replace the url in the markdown from the start to the end position
@@ -325,6 +355,7 @@ impl<'a> FileProcessorAPI for MarkdownProcessor<'a> {
                 title: info.title.as_ref(),
                 path: info.path.as_ref(),
                 id: None,
+                original_id: None,
             })
             .collect()
     }

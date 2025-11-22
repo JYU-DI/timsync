@@ -13,6 +13,7 @@ pub struct MarkdownFile {
     path: PathBuf,
     contents: Lazy<Result<String>>,
     front_matter_position: Lazy<Option<(usize, usize)>>,
+    lang_code: Option<String>,
 }
 
 impl ProjectFileAPI for MarkdownFile {
@@ -20,12 +21,17 @@ impl ProjectFileAPI for MarkdownFile {
         &self.path
     }
 
+    fn lang_code(&self) -> Option<&str> {
+        self.lang_code.as_deref()
+    }
+
     fn front_matter_pos(&self) -> Option<(usize, usize)> {
         get_or_set_front_matter_position(&self.contents, &self.front_matter_position, "---", "---")
     }
 
     fn contents(&self) -> Result<&str> {
-        get_or_read_file_contents(&self.path, &self.contents)
+        let api: &dyn ProjectFileAPI = self;
+        get_or_read_file_contents(api.full_path(), &self.contents)
     }
 
     fn processor_type(&self) -> FileProcessorType {
@@ -41,11 +47,12 @@ impl MarkdownFile {
     /// * `path` - The path to the markdown file.
     ///
     /// Returns: MarkdownFile
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, lang_code: Option<String>) -> Self {
         Self {
             path,
             contents: Lazy::new(),
             front_matter_position: Lazy::new(),
+            lang_code,
         }
     }
 }

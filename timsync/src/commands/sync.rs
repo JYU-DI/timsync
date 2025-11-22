@@ -1,5 +1,6 @@
 use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{hash_map::Entry, HashMap, HashSet, LinkedList};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -23,6 +24,7 @@ use crate::project::files::project_files::{ProjectFile, ProjectFileAPI};
 use crate::project::global_ctx::GlobalContext;
 use crate::project::project::Project;
 use crate::util::json::Merge;
+use crate::util::path::LanguageCodeExtraction;
 use crate::util::tim_client::{ItemType, TimClient, TimClientBuilder, TimClientErrors};
 
 #[derive(Debug, Args)]
@@ -30,6 +32,10 @@ pub struct SyncOpts {
     #[arg(default_value = "default")]
     /// The name of the sync target to send document to. Defaults to "default".
     target: String,
+
+    #[arg(long, short)]
+    /// The language to sync. If not specified, all non-language-specific files are synced.
+    language: Option<String>,
 }
 
 fn is_hidden(entry: &walkdir::DirEntry) -> bool {
@@ -85,6 +91,7 @@ struct SyncPipeline<'a> {
     project: &'a Project,
     global_context: Rc<OnceCell<GlobalContext>>,
     sync_target: &'a str,
+    language: Option<&'a str>,
     processors: HashMap<FileProcessorType, FileProcessor<'a>>,
     progress: MultiProgress,
 }
@@ -96,28 +103,42 @@ impl<'a> SyncPipeline<'a> {
     ///
     /// * `project`: The project to sync.
     /// * `sync_target`: The name of the sync target to send documents to.
+    /// * `language`: The language to sync.
     /// * `progress`: The multi-progress bar to display progress.
     ///
     /// returns: Result<SyncPipeline<'a>, Error>
-    fn new(project: &'a Project, sync_target: &'a str, progress: MultiProgress) -> Result<Self> {
+    fn new(
+        project: &'a Project,
+        sync_target: &'a str,
+        language: Option<&'a str>,
+        progress: MultiProgress,
+    ) -> Result<Self> {
         let global_context = Rc::new(OnceCell::new());
         Ok(SyncPipeline {
             project,
             processors: HashMap::from([
                 (
                     FileProcessorType::Markdown,
-                    MarkdownProcessor::new(project, sync_target, global_context.clone())?.into(),
+                    MarkdownProcessor::new(project, sync_target, language, global_context.clone())?
+                        .into(),
                 ),
                 (
                     FileProcessorType::TaskPlugin,
-                    TaskProcessor::new(project, global_context.clone())?.into(),
+                    TaskProcessor::new(project, language, global_context.clone())?.into(),
                 ),
                 (
                     FileProcessorType::StyleTheme,
-                    StyleThemeProcessor::new(project, sync_target, global_context.clone())?.into(),
+                    StyleThemeProcessor::new(
+                        project,
+                        sync_target,
+                        language,
+                        global_context.clone(),
+                    )?
+                    .into(),
                 ),
             ]),
             sync_target,
+            language,
             progress,
             global_context,
         })
@@ -137,14 +158,53 @@ impl<'a> SyncPipeline<'a> {
             .filter_entry(|e| !is_hidden(e) && !ignores.is_ignored(e.path()))
             .filter_map(|e| e.ok().map(|e| e.path().to_path_buf()))
             .filter(|e| e.is_file())
-            .filter_map(|e| ProjectFile::try_from(e).ok());
+            .filter_map(|e| ProjectFile::try_from(e.clone()).map(|p| (p, e)).ok());
 
-        for file in project_files {
+        // Group files by their normalized path (without language code)
+        // Store (ProjectFile, has_language_code) for each normalized path
+        let mut file_map: HashMap<PathBuf, (ProjectFile, bool)> = HashMap::new();
+
+        for (file, path) in project_files {
+            let lang_code = path.extract_language_code();
+
+            // Check if this file has the target language code
+            let is_target_lang = if let Some(code) = &lang_code {
+                self.language.map_or(false, |lang| code == lang)
+            } else {
+                false
+            };
+
+            // Get normalized path (without language code)
+            let normalized_path = file.path().clone();
+
+            match file_map.entry(normalized_path) {
+                Entry::Occupied(mut entry) => {
+                    let (_existing_file, existing_has_lang) = entry.get();
+
+                    // Replace if: new file has target language AND existing doesn't have language
+                    // This gives priority to language files over default files
+                    if is_target_lang && !existing_has_lang {
+                        entry.insert((file, true));
+                    }
+                    // Otherwise skip (keep existing file)
+                }
+                Entry::Vacant(entry) => {
+                    // Insert if no language is set OR file has no language code OR file has target language
+                    let should_insert =
+                        self.language.is_none() || lang_code.is_none() || is_target_lang;
+
+                    if should_insert {
+                        entry.insert((file, lang_code.is_some()));
+                    }
+                }
+            }
+        }
+
+        // Process selected files
+        for (file, _) in file_map.into_values() {
             let processor_type = file.processor_type();
-            let processor = self.processors.get_mut(&processor_type);
-            match processor {
-                Some(processor) => processor.add_file(file)?,
-                None => {}
+            if let Some(processor) = self.processors.get_mut(&processor_type) {
+                processor.add_file(file)?;
             }
         }
 
@@ -193,6 +253,7 @@ impl<'a> SyncPipeline<'a> {
 
         let mut process_stack: LinkedList<(String, Vec<ItemEntry>)> = LinkedList::new();
         let mut item_id_hashmap = HashMap::new();
+        let mut original_id_hashmap = HashMap::new();
 
         let current_path = tim_folder_root;
         let documents_with_paths = documents
@@ -205,19 +266,43 @@ impl<'a> SyncPipeline<'a> {
             .collect::<Vec<_>>();
         process_stack.push_front((current_path, documents_with_paths));
 
+        // Helper function to create item or translation
         async fn create_item(
             progress_bar: &ProgressBar,
             client: &TimClient,
             item_type: ItemType,
             path: String,
             title: &str,
-        ) -> Result<(String, u64)> {
+            language: Option<&str>,
+            main_language: Option<&str>,
+        ) -> Result<(String, u64, Option<u64>)> {
             progress_bar.set_message(format!("Creating item: {}", path));
-            let item_info = client
-                .create_or_update_item(item_type, &path, title)
-                .await?;
-            progress_bar.inc(1);
-            Ok((path, item_info.id))
+
+            // If language is set and it is a document, we create a translation
+            // Otherwise we create a normal item
+            // Folders are always created normally
+            if let (Some(lang), ItemType::Document) = (language, &item_type) {
+                // For translations, the path is already the base path (normalized)
+                // We need to get the original document ID and append /{lang} for the translation path
+                let original_item = client.get_item_info(&path).await.context(format!(
+                    "Original document {} not found. Cannot create translation.",
+                    path
+                ))?;
+
+                let translation_path = format!("{}/{}", path, lang);
+                let info = client
+                    .create_or_update_translation(original_item.id, &translation_path, lang, title)
+                    .await?;
+
+                progress_bar.inc(1);
+                Ok((translation_path, info.id, Some(original_item.id)))
+            } else {
+                let item_info = client
+                    .create_or_update_item(item_type, &path, title, main_language)
+                    .await?;
+                progress_bar.inc(1);
+                Ok((path, item_info.id, None))
+            }
         }
 
         while let Some((current_path, documents_with_paths)) = process_stack.pop_front() {
@@ -293,6 +378,8 @@ impl<'a> SyncPipeline<'a> {
                             ItemType::Document,
                             doc_path,
                             doc_entry.doc.title,
+                            self.language,
+                            sync_target.main_language.as_deref(),
                         ));
 
                         result.push(doc_entry);
@@ -306,6 +393,8 @@ impl<'a> SyncPipeline<'a> {
                             ItemType::Folder,
                             folder_path.clone(),
                             base,
+                            None,
+                            None,
                         ));
 
                         process_stack.push_front((folder_path, folder_entries));
@@ -317,10 +406,26 @@ impl<'a> SyncPipeline<'a> {
             // and collect the resulting IDs to be merged with the documents
             let item_create_results = try_join_all(futures).await?;
 
-            for (path, item_id) in item_create_results {
+            for (path, item_id, original_id) in item_create_results {
                 // Convert full path back to item_path that can be used for item ID lookup
+                // If language is set, we need to strip it from the path key in the map
+                // because the document path in `TIMDocument` does NOT contain the language part
                 let item_path = path[tim_folder_root_length + 1..].to_string();
-                item_id_hashmap.insert(item_path, item_id);
+
+                let item_path_key = if let Some(lang) = self.language {
+                    if item_path.ends_with(&format!("/{}", lang)) {
+                        item_path[..item_path.len() - lang.len() - 1].to_string()
+                    } else {
+                        item_path
+                    }
+                } else {
+                    item_path
+                };
+
+                item_id_hashmap.insert(item_path_key.clone(), item_id);
+                if let Some(oid) = original_id {
+                    original_id_hashmap.insert(item_path_key, oid);
+                }
             }
         }
 
@@ -332,6 +437,7 @@ impl<'a> SyncPipeline<'a> {
                     .get(ie.doc.path)
                     .map(|id| Some(*id))
                     .unwrap();
+                ie.doc.original_id = original_id_hashmap.get(ie.doc.path).copied();
                 ie.doc
             })
             .collect())
@@ -348,6 +454,7 @@ impl<'a> SyncPipeline<'a> {
             let mut doc_meta_json = doc.front_matter_json()?;
             doc_meta_json.merge(&json!({
                "doc_id": doc.id,
+               "original_doc_id": doc.original_id,
                 "path": doc.path,
                 "title": doc.title,
                 "local_file_path": doc.get_local_file_path(),
@@ -409,7 +516,12 @@ impl<'a> SyncPipeline<'a> {
         let tim_folder_root = sync_target.folder_root.clone();
 
         try_join_all(documents.iter().map(|doc| async {
-            let doc_path = format!("{}/{}", tim_folder_root, doc.path);
+            let mut doc_path = format!("{}/{}", tim_folder_root, doc.path);
+
+            // Add language code
+            if let Some(lang) = self.language {
+                doc_path.push_str(&format!("/{}", lang));
+            }
 
             progress_bar.set_message(format!("Uploading document: {}", doc_path));
 
@@ -515,7 +627,12 @@ pub async fn sync_target(opts: SyncOpts) -> Result<()> {
     tick_progress.disable_steady_tick();
     tick_progress.set_message("Uploading project");
 
-    let mut pipeline = SyncPipeline::new(&project, &opts.target, multi_progress)?;
+    let mut pipeline = SyncPipeline::new(
+        &project,
+        &opts.target,
+        opts.language.as_deref(),
+        multi_progress,
+    )?;
     pipeline.collect_tim_documents()?;
     let documents = pipeline.get_tim_documents();
     let documents = pipeline.create_tim_documents(&client, documents).await?;

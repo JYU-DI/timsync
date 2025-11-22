@@ -304,12 +304,20 @@ impl TimClient {
         item_type: ItemType,
         path: &str,
         title: &str,
+        language: Option<&str>,
     ) -> Result<ItemInfo> {
         let item_info = self.get_item_info(&path).await;
         match item_info {
             Ok(info) => {
                 if info.item_type == item_type {
                     self.set_item_title(&path, title).await?;
+
+                    if info.item_type == ItemType::Document {
+                        if let Some(language) = language {
+                            self.set_item_translation(&path, title, language).await?;
+                        }
+                    }
+
                     Ok(info)
                 } else {
                     Err(TimClientErrors::InvalidItemType(
@@ -326,7 +334,84 @@ impl TimClient {
                         // Item does not exist, create it
                         self.create_item(item_type, &path, title).await?;
                         let item_info = self.get_item_info(&path).await?;
+                        if item_info.item_type == ItemType::Document {
+                            if let Some(language) = language {
+                                self.set_item_translation(&path, title, language).await?;
+                            }
+                        }
                         Ok(item_info)
+                    }
+                    _ => Err(e),
+                }
+            }
+        }
+    }
+
+    /// Create a translation for an item (document) in TIM.
+    ///
+    /// # Arguments
+    ///
+    /// * `doc_id`: ID of the document to translate.
+    /// * `lang`: Language code of the translation.
+    /// * `title`: Title of the translated document.
+    ///
+    /// returns: Result<(), Error>
+    pub async fn create_translation(&self, doc_id: u64, lang: &str, title: &str) -> Result<()> {
+        let result = self
+            .post(&format!("translate/{}/{}/Manual", doc_id, lang))
+            .json(&json!({"doc_title": title}))
+            .send()
+            .await
+            .with_context(|| format!("Could not create translation for item {}", doc_id))?;
+
+        if result.status().is_success() {
+            Ok(())
+        } else {
+            Err(TimClientErrors::CouldNotCreateItem(
+                format!("{}/{}", doc_id, lang),
+                result.status().to_string(),
+            )
+            .into())
+        }
+    }
+
+    /// Create a new translation for an item (document) in TIM, or update the title if it already exists.
+    /// Returns information about the translation item.
+    ///
+    /// # Arguments
+    ///
+    /// * `original_doc_id`: ID of the original document.
+    /// * `path`: Full path to the translation, e.g. `kurssit/tie/kurssi/en`.
+    /// * `lang`: Language code of the translation.
+    /// * `title`: Title of the translated document.
+    ///
+    /// returns: Result<ItemInfo, Error>
+    pub async fn create_or_update_translation(
+        &self,
+        original_doc_id: u64,
+        path: &str,
+        lang: &str,
+        title: &str,
+    ) -> Result<ItemInfo> {
+        let item_info = self.get_item_info(&path).await;
+        match item_info {
+            Ok(info) => {
+                // Translation exists, update title if needed
+                self.set_item_title(&path, title).await?;
+                Ok(info)
+            }
+            Err(e) => {
+                match e.downcast_ref::<TimClientErrors>() {
+                    Some(TimClientErrors::ItemNotFound(_, _)) => {
+                        // Translation does not exist, create it
+                        self.create_translation(original_doc_id, lang, title)
+                            .await?;
+                        // Fetch info after creation to get ID
+                        let info = self.get_item_info(&path).await.context(format!(
+                            "Could not get item info for created translation: {}",
+                            path
+                        ))?;
+                        Ok(info)
                     }
                     _ => Err(e),
                 }
@@ -353,6 +438,45 @@ impl TimClient {
             .send()
             .await
             .with_context(|| format!("Could not set title for item {}", item_path))?;
+
+        if result.status().is_success() {
+            Ok(())
+        } else {
+            Err(TimClientErrors::ItemError(
+                item_path.to_string(),
+                result.status().to_string(),
+                result.text().await.unwrap_or("<none>".to_string()),
+            )
+            .into())
+        }
+    }
+
+    /// Set the translation of an item (document) in TIM.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_path`: Full path to the item, e.g. `kurssit/tie/kurssi`.
+    /// * `title`: New title for the item.
+    /// * `language`: Language code of the translation.
+    ///
+    /// returns: Result<(), Error>
+    pub async fn set_item_translation(
+        &self,
+        item_path: &str,
+        title: &str,
+        language: &str,
+    ) -> Result<()> {
+        let item = self.get_item_info(item_path).await?;
+
+        let result = self
+            .post(&format!("translation/{}", item.id))
+            .json(&json!({
+                "new_title": title,
+                "new_langid": language,
+            }))
+            .send()
+            .await
+            .with_context(|| format!("Could not set translation for item {}", item_path))?;
 
         if result.status().is_success() {
             Ok(())

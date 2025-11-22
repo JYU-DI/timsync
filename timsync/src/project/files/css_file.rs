@@ -12,6 +12,7 @@ pub struct CSSFile {
     path: PathBuf,
     contents: Lazy<anyhow::Result<String>>,
     front_matter_position: Lazy<Option<(usize, usize)>>,
+    lang_code: Option<String>,
 }
 
 impl CSSFile {
@@ -22,9 +23,10 @@ impl CSSFile {
     /// * `path` - The path to the (S)CSS file.
     ///
     /// Returns: CSSFile
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, lang_code: Option<String>) -> Self {
         Self {
             path,
+            lang_code,
             contents: Lazy::new(),
             front_matter_position: Lazy::new(),
         }
@@ -36,12 +38,17 @@ impl ProjectFileAPI for CSSFile {
         &self.path
     }
 
+    fn lang_code(&self) -> Option<&str> {
+        self.lang_code.as_deref()
+    }
+
     fn front_matter_pos(&self) -> Option<(usize, usize)> {
         get_or_set_front_matter_position(&self.contents, &self.front_matter_position, "/*", "*/")
     }
 
     fn contents(&self) -> anyhow::Result<&str> {
-        get_or_read_file_contents(&self.path, &self.contents)
+        let api: &dyn ProjectFileAPI = self;
+        get_or_read_file_contents(api.full_path(), &self.contents)
     }
 
     fn processor_type(&self) -> FileProcessorType {

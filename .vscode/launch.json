@@ -1,13 +1,10 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'timsync'",
+            "name": "Debug timsync sync",
             "cargo": {
                 "args": [
                     "build",
@@ -19,17 +16,21 @@
                     "kind": "bin"
                 }
             },
-            "args": ["sync"],
-            "cwd": "${workspaceFolder}/test_project"
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+            "args": [
+                "sync"
+            ],
+            "cwd": "${workspaceFolder}/example"
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'timsync'",
+            "name": "Debug timsync sync (en-US)",
             "cargo": {
                 "args": [
-                    "test",
-                    "--no-run",
+                    "build",
                     "--bin=timsync",
                     "--package=timsync"
                 ],
@@ -38,8 +39,15 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+            "args": [
+                "sync",
+                "--language",
+                "en-US"
+            ],
+            "cwd": "${workspaceFolder}/example"
         }
     ]
 }

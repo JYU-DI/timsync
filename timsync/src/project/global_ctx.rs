@@ -87,6 +87,17 @@ impl GlobalContext {
         self.global_data.extend(data);
     }
 
+    /// Get a value from the global data.
+    ///
+    /// # Arguments
+    ///
+    /// * `key`: The key of the value
+    ///
+    /// returns: Option<&Value>
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        self.global_data.get(key)
+    }
+
     /// Convert the global data to a Handlebars context.
     ///
     /// returns: Context

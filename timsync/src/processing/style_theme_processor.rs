@@ -29,10 +29,16 @@ impl<'a> StyleThemeProcessor<'a> {
     pub fn new(
         project: &'a Project,
         sync_target: &str,
+        language: Option<&'a str>,
         global_context: Rc<OnceCell<GlobalContext>>,
     ) -> Result<Self> {
         Ok(Self {
-            markdown_processor: MarkdownProcessor::new(project, sync_target, global_context)?,
+            markdown_processor: MarkdownProcessor::new(
+                project,
+                sync_target,
+                language,
+                global_context,
+            )?,
             file_paths_by_name: HashMap::new(),
         })
     }

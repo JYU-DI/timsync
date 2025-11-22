@@ -18,6 +18,9 @@ pub struct TIMDocument<'a> {
 
     /// The ID of the TIM document if present.
     pub id: Option<u64>,
+
+    /// The ID of the original document if this is a translation.
+    pub original_id: Option<u64>,
 }
 
 impl TIMDocument<'_> {
