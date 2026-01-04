@@ -34,13 +34,13 @@ jobs:
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
-      run: cargo build --release --verbose
+      run: cargo build --release --verbose --locked
     - name: Rename asset
       run: |
         mkdir artifacts
         cp target/release/${{ matrix.exe_name }} artifacts/timsync.${{ matrix.platform }}
     - name: Collect artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: timsync.${{ matrix.platform }}
         path: artifacts/timsync.${{ matrix.platform }}
@@ -57,7 +57,7 @@ jobs:
   
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3.0.0
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
       - name: Create release
