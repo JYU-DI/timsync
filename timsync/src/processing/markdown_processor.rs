@@ -41,6 +41,11 @@ pub struct DocumentSettings {
     /// The path of the document in TIM
     /// If not specified, the path of the file will be used
     pub tim_path: Option<String>,
+
+    /// Whether the document is external.
+    /// If true, the document will be created in TIM if it does not exist,
+    /// but the content will not be uploaded.
+    pub external: Option<bool>,
 }
 
 /// Processor for markdown files.
@@ -298,6 +303,7 @@ impl<'a> FileProcessorAPI for MarkdownProcessor<'a> {
             _ => DocumentSettings {
                 title: None,
                 tim_path: None,
+                external: None,
             },
         };
 

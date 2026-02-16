@@ -525,6 +525,17 @@ impl<'a> SyncPipeline<'a> {
 
             progress_bar.set_message(format!("Uploading document: {}", doc_path));
 
+            // Check if document is marked as external
+            // If so, we skip the upload process completely
+            // We still create the document (which happened in the previous step),
+            // but we don't upload the content
+            let front_matter = doc.front_matter_json()?;
+            if let Some(true) = front_matter.get("external").and_then(|v| v.as_bool()) {
+                info!("Skipping upload for external document: {}", doc_path);
+                progress_bar.inc(1);
+                return Ok(());
+            }
+
             let prepared_doc = doc.render_contents()?;
 
             // Upload files
