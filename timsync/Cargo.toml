@@ -42,6 +42,7 @@ rand = "0.8.5"
 rand_xoshiro = "0.6.0"
 rand_seeder = "0.3.0"
 indoc = "2.0.5"
+rhai = "1.24.0"
 
 
 [build-dependencies]

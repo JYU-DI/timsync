@@ -10,6 +10,7 @@ use crate::templating::helpers::task_id::task_id_helper;
 use crate::templating::helpers::url_for::url_for_helper;
 use anyhow::Context;
 use handlebars::Handlebars;
+use rhai::Engine;
 
 pub const FILE_MAP_ATTRIBUTE: &str = "$_timsync_upload_files";
 const TEMPLATE_FOLDER: &str = "_templates";
@@ -91,9 +92,15 @@ impl TimRendererExt for Handlebars<'_> {
         let helper_files = project
             .find_files(HELPERS_FOLDER, "*.rhai")
             .with_context(|| format!("Could not find helpers from folder {}", HELPERS_FOLDER))?;
+
+        let mut engine = Engine::new();
+        engine.set_max_expr_depths(1024, 1024);
+        self.set_engine(engine);
+
         for (name, helper) in helper_files {
             let name = name.trim_end_matches(".rhai");
-            self.register_script_helper_file(&name, helper)?;
+            self.register_script_helper_file(&name, helper)
+                .with_context(|| format!("Could not load helper '{}'", name))?;
         }
 
         Ok(self)
