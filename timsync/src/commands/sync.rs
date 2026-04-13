@@ -189,9 +189,11 @@ impl<'a> SyncPipeline<'a> {
                     // Otherwise skip (keep existing file)
                 }
                 Entry::Vacant(entry) => {
-                    // Insert if no language is set OR file has no language code OR file has target language
+                    // Insert if either one holds
+                    // - no upload language is set and this has no lang code
+                    // - upload language is set; we do not care if target lang is set here since we just want some first file in (the occupy handler will handle priority)
                     let should_insert =
-                        self.language.is_none() || lang_code.is_none() || is_target_lang;
+                        (self.language.is_none() && lang_code.is_none()) || self.language.is_some();
 
                     if should_insert {
                         entry.insert((file, lang_code.is_some()));
